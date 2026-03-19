@@ -5,7 +5,7 @@ const msg = body.message;
 let reply = "";
 
 // 🧠 简单“AI决策”（后面可换DeepSeek）
-if (msg.includes("回归") || msg.includes("直线")) {
+reply = `已调用统计CLI：\n斜率 = ${result.slope.toFixed(2)}\n截距 = ${result.intercept.toFixed(2)}`;
 // 👉 模拟 CLI 调用
 const result = linearRegression({
 x: [1, 2, 3, 4],

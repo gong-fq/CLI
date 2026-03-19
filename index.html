@@ -316,6 +316,32 @@
     return wrap;
   }
 
+  // ── Mock chat.js（与 Netlify Functions 版本逻辑完全一致）────
+  function mockChatHandler(msg) {
+    let reply = '';
+    if (msg.includes('回归') || msg.includes('直线')) {
+      const result = linearRegression({ x: [1,2,3,4], y: [2,4,5,8] });
+      reply = `已调用统计CLI：\n斜率 = ${result.slope.toFixed(2)}\n截距 = ${result.intercept.toFixed(2)}`;
+    } else {
+      reply = '我目前支持：线性回归（试试说：拟合一条直线）';
+    }
+    return { reply };
+  }
+
+  function linearRegression(data) {
+    const x = data.x, y = data.y, n = x.length;
+    const xMean = x.reduce((a,b)=>a+b)/n;
+    const yMean = y.reduce((a,b)=>a+b)/n;
+    let num = 0, den = 0;
+    for (let i = 0; i < n; i++) {
+      num += (x[i]-xMean)*(y[i]-yMean);
+      den += (x[i]-xMean)**2;
+    }
+    const slope = num / den;
+    const intercept = yMean - slope * xMean;
+    return { slope, intercept };
+  }
+
   // ── Send ──────────────────────────────────────────────
   async function sendMessage() {
     const msg = inputEl.value.trim();
@@ -326,27 +352,17 @@
     addBubble('user', escHtml(msg));
     const thinkBubble = addBubble('bot', '<em style="color:var(--muted)">工具调用中…</em>');
 
-    try {
-      const res  = await fetch('/.netlify/functions/chat', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ message: msg })
-      });
-      const data = await res.json();
-      const reply = data.reply || '（无回复）';
+    // 模拟网络延迟，体现 CLI 调用感
+    await new Promise(r => setTimeout(r, 420));
 
-      // Replace thinking bubble
-      thinkBubble.querySelector('div:last-child').innerHTML = formatReply(reply);
+    const data  = mockChatHandler(msg);
+    const reply = data.reply || '（无回复）';
+    thinkBubble.querySelector('div:last-child').innerHTML = formatReply(reply);
 
-      // If reply contains slope/intercept → draw chart
-      const slopeMatch = reply.match(/斜率\s*=\s*([\d.\-]+)/);
-      const intMatch   = reply.match(/截距\s*=\s*([\d.\-]+)/);
-      if (slopeMatch && intMatch) {
-        drawChart(parseFloat(slopeMatch[1]), parseFloat(intMatch[1]));
-      }
-    } catch (err) {
-      thinkBubble.querySelector('div:last-child').innerHTML =
-        `<span style="color:#f85149">请求失败：${escHtml(err.message)}</span>`;
+    const slopeMatch = reply.match(/斜率\s*=\s*([\d.\-]+)/);
+    const intMatch   = reply.match(/截距\s*=\s*([\d.\-]+)/);
+    if (slopeMatch && intMatch) {
+      drawChart(parseFloat(slopeMatch[1]), parseFloat(intMatch[1]));
     }
 
     sendBtn.disabled = false;

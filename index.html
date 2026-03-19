@@ -1,3 +1,489 @@
 <!DOCTYPE html>
 <html lang="zh">
 <head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CLI-Anything · 统计工具台</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:        #0d1117;
+      --panel:     #161b22;
+      --border:    #30363d;
+      --accent:    #f0883e;
+      --accent2:   #58a6ff;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --user-bg:   #1c2433;
+      --bot-bg:    #1a2233;
+      --radius:    10px;
+      --font-ui:   'Noto Serif SC', serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    /* ── Header ── */
+    header {
+      width: 100%;
+      max-width: 780px;
+      padding: 36px 24px 0;
+    }
+    .header-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: .14em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    h1 {
+      font-size: clamp(22px, 4vw, 32px);
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.25;
+    }
+    h1 span { color: var(--accent); }
+    .subtitle {
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+    }
+    .divider {
+      margin: 20px 0 0;
+      border: none;
+      border-top: 1px solid var(--border);
+    }
+
+    /* ── Chat window ── */
+    main {
+      flex: 1;
+      width: 100%;
+      max-width: 780px;
+      padding: 0 24px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    #chat-box {
+      flex: 1;
+      min-height: 360px;
+      max-height: 54vh;
+      overflow-y: auto;
+      padding: 20px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    .bubble {
+      display: flex;
+      flex-direction: column;
+      max-width: 88%;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      line-height: 1.7;
+      animation: fadeUp .25s ease both;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .bubble.user {
+      align-self: flex-end;
+      background: var(--user-bg);
+      border: 1px solid var(--border);
+    }
+    .bubble.bot {
+      align-self: flex-start;
+      background: var(--bot-bg);
+      border: 1px solid var(--border);
+    }
+
+    .bubble-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      letter-spacing: .1em;
+      margin-bottom: 5px;
+    }
+    .bubble.user .bubble-label { color: var(--accent2); }
+    .bubble.bot  .bubble-label { color: var(--accent); }
+
+    /* code blocks inside bot replies */
+    .bubble.bot pre {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin-top: 8px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      white-space: pre-wrap;
+      color: #79c0ff;
+    }
+
+    /* ── Chart area ── */
+    #chart-wrap {
+      display: none;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px 14px;
+      margin-bottom: 16px;
+      animation: fadeUp .3s ease both;
+    }
+    #chart-wrap h2 {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: .12em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    #reg-canvas {
+      width: 100%;
+      height: 220px;
+      display: block;
+    }
+    #chart-info {
+      margin-top: 10px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      gap: 24px;
+    }
+    #chart-info span { color: var(--text); }
+
+    /* ── Input bar ── */
+    .input-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      border-top: 1px solid var(--border);
+      padding-top: 16px;
+    }
+
+    .hint-chips {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .chip {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      cursor: pointer;
+      background: transparent;
+      transition: border-color .18s, color .18s;
+    }
+    .chip:hover { border-color: var(--accent); color: var(--accent); }
+
+    #user-input {
+      flex: 1;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: 14px;
+      padding: 11px 14px;
+      resize: none;
+      outline: none;
+      transition: border-color .18s;
+      line-height: 1.5;
+    }
+    #user-input:focus { border-color: var(--accent2); }
+
+    #send-btn {
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius);
+      color: #000;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 11px 22px;
+      cursor: pointer;
+      transition: opacity .18s, transform .12s;
+      white-space: nowrap;
+    }
+    #send-btn:hover   { opacity: .88; }
+    #send-btn:active  { transform: scale(.96); }
+    #send-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    footer {
+      width: 100%;
+      max-width: 780px;
+      padding: 10px 24px 24px;
+      font-size: 11px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <p class="header-tag">CLI-Anything · 练习项目</p>
+  <h1>统计工具台 <span>/ Linear Regression</span></h1>
+  <p class="subtitle">天津财经大学统计学院教授　龚凤乾</p>
+  <hr class="divider" />
+</header>
+
+<main>
+  <!-- Chart (shown after regression) -->
+  <div id="chart-wrap">
+    <h2>拟合结果可视化</h2>
+    <canvas id="reg-canvas"></canvas>
+    <div id="chart-info">
+      斜率 b₁：<span id="ci-slope">—</span>
+      &nbsp;截距 b₀：<span id="ci-int">—</span>
+      &nbsp;R²：<span id="ci-r2">—</span>
+    </div>
+  </div>
+
+  <!-- Chat -->
+  <div id="chat-box"></div>
+
+  <!-- Hint chips -->
+  <div class="hint-chips">
+    <button class="chip" onclick="fillInput('拟合一条直线')">拟合一条直线</button>
+    <button class="chip" onclick="fillInput('帮我做线性回归')">线性回归</button>
+    <button class="chip" onclick="fillInput('你支持什么功能？')">支持什么功能？</button>
+  </div>
+
+  <!-- Input -->
+  <div class="input-row">
+    <textarea id="user-input" rows="2" placeholder="输入消息，回车发送…"></textarea>
+    <button id="send-btn" onclick="sendMessage()">发送</button>
+  </div>
+</main>
+
+<footer>CLI-Anything · Netlify Functions · DeepSeek API（模拟）</footer>
+
+<!-- Lightweight chart (no external lib) -->
+<script>
+  // ── Utility ──────────────────────────────────────────
+  const chatBox   = document.getElementById('chat-box');
+  const inputEl   = document.getElementById('user-input');
+  const sendBtn   = document.getElementById('send-btn');
+  const chartWrap = document.getElementById('chart-wrap');
+  const canvas    = document.getElementById('reg-canvas');
+
+  function fillInput(text) {
+    inputEl.value = text;
+    inputEl.focus();
+  }
+
+  inputEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+
+  // ── Chat bubbles ──────────────────────────────────────
+  function addBubble(role, html) {
+    const wrap  = document.createElement('div');
+    wrap.className = `bubble ${role}`;
+    const label = document.createElement('div');
+    label.className = 'bubble-label';
+    label.textContent = role === 'user' ? 'YOU' : 'CLI-AGENT';
+    wrap.appendChild(label);
+    const body = document.createElement('div');
+    body.innerHTML = html;
+    wrap.appendChild(body);
+    chatBox.appendChild(wrap);
+    chatBox.scrollTop = chatBox.scrollHeight;
+    return wrap;
+  }
+
+  // ── Send ──────────────────────────────────────────────
+  async function sendMessage() {
+    const msg = inputEl.value.trim();
+    if (!msg) return;
+    inputEl.value = '';
+    sendBtn.disabled = true;
+
+    addBubble('user', escHtml(msg));
+    const thinkBubble = addBubble('bot', '<em style="color:var(--muted)">工具调用中…</em>');
+
+    try {
+      const res  = await fetch('/.netlify/functions/chat', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ message: msg })
+      });
+      const data = await res.json();
+      const reply = data.reply || '（无回复）';
+
+      // Replace thinking bubble
+      thinkBubble.querySelector('div:last-child').innerHTML = formatReply(reply);
+
+      // If reply contains slope/intercept → draw chart
+      const slopeMatch = reply.match(/斜率\s*=\s*([\d.\-]+)/);
+      const intMatch   = reply.match(/截距\s*=\s*([\d.\-]+)/);
+      if (slopeMatch && intMatch) {
+        drawChart(parseFloat(slopeMatch[1]), parseFloat(intMatch[1]));
+      }
+    } catch (err) {
+      thinkBubble.querySelector('div:last-child').innerHTML =
+        `<span style="color:#f85149">请求失败：${escHtml(err.message)}</span>`;
+    }
+
+    sendBtn.disabled = false;
+    inputEl.focus();
+  }
+
+  // ── Format bot reply (wrap code-like block in <pre>) ──
+  function formatReply(text) {
+    // Lines after "已调用统计CLI：" → pre block
+    const parts = text.split('已调用统计CLI：');
+    if (parts.length === 2) {
+      return escHtml('已调用统计CLI：') +
+        `<pre>${escHtml(parts[1].trim())}</pre>`;
+    }
+    return escHtml(text);
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  // ── Canvas chart ──────────────────────────────────────
+  // Data points hardcoded to match chat.js demo data
+  const DATA_X = [1, 2, 3, 4];
+  const DATA_Y = [2, 4, 5, 8];
+
+  function drawChart(slope, intercept) {
+    chartWrap.style.display = 'block';
+
+    // Compute R²
+    const n = DATA_X.length;
+    const yMean = DATA_Y.reduce((a,b)=>a+b) / n;
+    const ssTot = DATA_Y.reduce((s,y)=>s+(y-yMean)**2, 0);
+    const ssRes = DATA_X.reduce((s,x,i)=>s+(DATA_Y[i]-(slope*x+intercept))**2, 0);
+    const r2    = 1 - ssRes/ssTot;
+
+    document.getElementById('ci-slope').textContent = slope.toFixed(4);
+    document.getElementById('ci-int').textContent   = intercept.toFixed(4);
+    document.getElementById('ci-r2').textContent    = r2.toFixed(4);
+
+    // HiDPI
+    const dpr = window.devicePixelRatio || 1;
+    const W   = canvas.parentElement.clientWidth - 40;
+    const H   = 220;
+    canvas.style.width  = W + 'px';
+    canvas.style.height = H + 'px';
+    canvas.width  = W * dpr;
+    canvas.height = H * dpr;
+
+    const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+
+    // Margins
+    const ml = 44, mr = 16, mt = 14, mb = 36;
+    const cw = W - ml - mr;
+    const ch = H - mt - mb;
+
+    // Scale
+    const xMin = 0, xMax = 5;
+    const yMin = 0, yMax = 10;
+    const sx = x => ml + (x - xMin) / (xMax - xMin) * cw;
+    const sy = y => mt + ch - (y - yMin) / (yMax - yMin) * ch;
+
+    ctx.clearRect(0, 0, W, H);
+
+    // Grid
+    ctx.strokeStyle = '#21262d';
+    ctx.lineWidth = 1;
+    for (let gx = 0; gx <= 5; gx++) {
+      ctx.beginPath(); ctx.moveTo(sx(gx), mt); ctx.lineTo(sx(gx), mt+ch); ctx.stroke();
+    }
+    for (let gy = 0; gy <= 10; gy+=2) {
+      ctx.beginPath(); ctx.moveTo(ml, sy(gy)); ctx.lineTo(ml+cw, sy(gy)); ctx.stroke();
+    }
+
+    // Axes
+    ctx.strokeStyle = '#30363d';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(ml, mt); ctx.lineTo(ml, mt+ch); ctx.lineTo(ml+cw, mt+ch); ctx.stroke();
+
+    // Axis labels
+    ctx.fillStyle = '#8b949e';
+    ctx.font = '11px JetBrains Mono, monospace';
+    ctx.textAlign = 'center';
+    for (let gx = 0; gx <= 5; gx++) {
+      ctx.fillText(gx, sx(gx), mt+ch+18);
+    }
+    ctx.textAlign = 'right';
+    for (let gy = 0; gy <= 10; gy+=2) {
+      ctx.fillText(gy, ml-6, sy(gy)+4);
+    }
+
+    // Regression line
+    const x0 = xMin, x1 = xMax;
+    const y0 = slope*x0+intercept, y1 = slope*x1+intercept;
+    ctx.strokeStyle = '#f0883e';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(sx(x0), sy(y0)); ctx.lineTo(sx(x1), sy(y1)); ctx.stroke();
+
+    // Residual lines
+    ctx.strokeStyle = '#58a6ff44';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3,3]);
+    DATA_X.forEach((x, i) => {
+      const yHat = slope*x+intercept;
+      ctx.beginPath(); ctx.moveTo(sx(x), sy(DATA_Y[i])); ctx.lineTo(sx(x), sy(yHat)); ctx.stroke();
+    });
+    ctx.setLineDash([]);
+
+    // Data points
+    DATA_X.forEach((x, i) => {
+      ctx.beginPath();
+      ctx.arc(sx(x), sy(DATA_Y[i]), 5, 0, Math.PI*2);
+      ctx.fillStyle = '#58a6ff';
+      ctx.fill();
+      ctx.strokeStyle = '#0d1117';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    });
+
+    // Legend
+    ctx.font = '11px JetBrains Mono, monospace';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#f0883e';
+    ctx.fillRect(ml+8, mt+6, 18, 2);
+    ctx.fillStyle = '#8b949e';
+    ctx.fillText(`ŷ = ${slope.toFixed(2)}x + ${intercept.toFixed(2)}`, ml+30, mt+12);
+  }
+
+  // ── Welcome message ───────────────────────────────────
+  window.addEventListener('DOMContentLoaded', () => {
+    addBubble('bot',
+      '欢迎使用 <strong>CLI-Anything 统计工具台</strong>。<br>' +
+      '试试点击下方提示词，或直接输入：<em>拟合一条直线</em>'
+    );
+  });
+</script>
+</body>
+</html>

@@ -574,107 +574,108 @@ function lnGamma(n) {
 function betaFn(a,b){return gamma(a)*gamma(b)/gamma(a+b);}
 
 function runCustomPlot(args) {
-  // 支持单曲线（pdf_js）和多曲线（curves数组）
-  // curves: [{label, pdf_js, color?}]
   const {
-    title, info='', plot_type='curve',
-    x_min, x_max, y_max: y_max_hint,
-    pdf_js, description='',
-    curves   // 多曲线模式
+    title, info, plot_type, x_min, x_max, y_max: y_max_hint,
+    pdf_js, description, curves
   } = args;
 
   const CURVE_COLORS = ['#bc8cff','#f0883e','#3fb950','#58a6ff','#ff7b72','#e3b341'];
 
-  // 构建曲线列表
   let curveList = [];
   if (curves && Array.isArray(curves) && curves.length > 0) {
-    curves.forEach((c, i) => {
+    curves.forEach(function(c, i) {
       let fn;
-      try { fn = new Function('x','gamma','lnGamma','betaFn', c.pdf_js); } catch(e) { fn = ()=>0; }
-      curveList.push({
-        label: c.label || `曲线${i+1}`,
-        color: c.color || CURVE_COLORS[i % CURVE_COLORS.length],
-        fn
-      });
+      try { fn = new Function('x','gamma','lnGamma','betaFn', c.pdf_js); } catch(e) { fn = function(){return 0;}; }
+      curveList.push({ label: c.label || ('曲线'+(i+1)), color: c.color || CURVE_COLORS[i % CURVE_COLORS.length], fn: fn });
     });
   } else if (pdf_js) {
     let fn;
-    try { fn = new Function('x','gamma','lnGamma','betaFn', pdf_js); } catch(e) {
-      return {reply: `已调用统计CLI：
-动态绘图代码编译失败：${e.message}`};
-    }
-    curveList.push({ label: title, color: CURVE_COLORS[0], fn });
+    try { fn = new Function('x','gamma','lnGamma','betaFn', pdf_js); }
+    catch(e) { return { reply: '已调用统计CLI：\n动态绘图代码编译失败：' + e.message }; }
+    curveList.push({ label: title, color: CURVE_COLORS[0], fn: fn });
   } else {
-    return {reply: '已调用统计CLI：
-缺少绘图代码'};
+    return { reply: '已调用统计CLI：\n缺少绘图代码' };
   }
 
-  const safePdf = (fn, x) => {
-    try { const v=fn(x,gamma,lnGamma,betaFn); return isFinite(v)&&v>=0?v:0; } catch{return 0;}
+  const safePdf = function(fn, x) {
+    try { var v = fn(x, gamma, lnGamma, betaFn); return (isFinite(v) && v >= 0) ? v : 0; } catch(e) { return 0; }
   };
 
-  // 自动计算 y_max：采样各曲线，取 95th 百分位 × 1.3，避免奇点撑爆坐标轴
-  const STEPS = 400;
-  const dx = (x_max - x_min) / STEPS;
-  // 从 x_min 的 1% 处开始采样，避免奇点（如卡方 k=1 在 x=0 处为 ∞）
-  const x_start = x_min + (x_max - x_min) * 0.005;
-  let samples = [];
-  curveList.forEach(c => {
-    for (let i = 1; i <= STEPS; i++) {
-      const v = safePdf(c.fn, x_start + i * dx);
+  // 自动计算 y_max：取各曲线采样值的 95th 百分位 × 1.35（跳过 x_min 附近的奇点）
+  var STEPS = 400;
+  var xStart = x_min + (x_max - x_min) * 0.005;
+  var dx = (x_max - xStart) / STEPS;
+  var samples = [];
+  curveList.forEach(function(c) {
+    for (var i = 1; i <= STEPS; i++) {
+      var v = safePdf(c.fn, xStart + i * dx);
       if (v > 0) samples.push(v);
     }
   });
-  samples.sort((a,b) => a-b);
-  const p95 = samples[Math.floor(samples.length * 0.95)] || 0.5;
-  const y_max = y_max_hint && y_max_hint > 0 ? y_max_hint : p95 * 1.35;
+  samples.sort(function(a,b){return a-b;});
+  var p95 = samples[Math.floor(samples.length * 0.95)] || 0.5;
+  var y_max = (y_max_hint && y_max_hint > 0) ? y_max_hint : p95 * 1.35;
 
-  const reply = `已调用统计CLI：
-${title}
-${description}`;
+  var descText = description || '';
+  var reply = '已调用统计CLI：\n' + title + (descText ? '\n' + descText : '');
 
-  return {reply, draw:()=>{
-    setupViz(title, info||'');
-    const {ctx,ml,mt,cw,ch}=getCtx();
-    const sx=mkS([x_min,x_max],ml,cw), sy=mkSY([0,y_max],mt,ch);
-    drawGrid(ctx,[x_min,x_max],[0,y_max],sx,sy,ml,mt,cw,ch,8,5);
+  return { reply: reply, draw: function() {
+    setupViz(title, info || '');
+    var g = getCtx();
+    var ctx = g.ctx, ml = g.ml, mt = g.mt, cw = g.cw, ch = g.ch;
+    var sx = mkS([x_min, x_max], ml, cw);
+    var sy = mkSY([0, y_max], mt, ch);
+    drawGrid(ctx, [x_min, x_max], [0, y_max], sx, sy, ml, mt, cw, ch, 8, 5);
 
-    if(plot_type==='bars'){
-      const nSteps=Math.min(Math.round(x_max-x_min),30);
-      const bw=cw/(nSteps+2)/(curveList.length||1);
-      curveList.forEach((c,ci)=>{
-        for(let k=0;k<=nSteps;k++){
-          const x=x_min+k, p=safePdf(c.fn,x);
-          const bh=Math.max(0,(p/y_max)*ch);
-          const bx=ml+(k+1)*cw/(nSteps+2)+(ci-(curveList.length-1)/2)*bw;
-          ctx.fillStyle=c.color+'88'; ctx.fillRect(bx-bw*0.4,mt+ch-bh,bw*0.8,bh);
-          ctx.strokeStyle=c.color; ctx.lineWidth=1; ctx.strokeRect(bx-bw*0.4,mt+ch-bh,bw*0.8,bh);
-          if(ci===0){ctx.fillStyle='#8b949e';ctx.font='9px JetBrains Mono,monospace';ctx.textAlign='center';ctx.fillText(x,bx,mt+ch+14);}
+    if (plot_type === 'bars') {
+      var nSteps = Math.min(Math.round(x_max - x_min), 30);
+      var bw = cw / (nSteps + 2) / (curveList.length || 1);
+      curveList.forEach(function(c, ci) {
+        for (var k = 0; k <= nSteps; k++) {
+          var x = x_min + k;
+          var p = safePdf(c.fn, x);
+          var bh = Math.max(0, (p / y_max) * ch);
+          var bx = ml + (k + 1) * cw / (nSteps + 2) + (ci - (curveList.length - 1) / 2) * bw;
+          ctx.fillStyle = c.color + '88';
+          ctx.fillRect(bx - bw * 0.4, mt + ch - bh, bw * 0.8, bh);
+          ctx.strokeStyle = c.color; ctx.lineWidth = 1;
+          ctx.strokeRect(bx - bw * 0.4, mt + ch - bh, bw * 0.8, bh);
+          if (ci === 0) {
+            ctx.fillStyle = '#8b949e';
+            ctx.font = '9px JetBrains Mono,monospace';
+            ctx.textAlign = 'center';
+            ctx.fillText(x, bx, mt + ch + 14);
+          }
         }
       });
     } else {
-      // 连续曲线：先画填充（仅第一条），再画所有线
-      if(curveList.length===1){
-        const c=curveList[0];
-        ctx.fillStyle=c.color+'15'; ctx.beginPath(); ctx.moveTo(sx(x_start),sy(0));
-        for(let i=0;i<=STEPS;i++){const x=x_start+i*dx; ctx.lineTo(sx(x),sy(safePdf(c.fn,x)));}
-        ctx.lineTo(sx(x_max),sy(0)); ctx.closePath(); ctx.fill();
+      if (curveList.length === 1) {
+        var c0 = curveList[0];
+        ctx.fillStyle = c0.color + '15';
+        ctx.beginPath(); ctx.moveTo(sx(xStart), sy(0));
+        for (var i = 0; i <= STEPS; i++) {
+          var xi = xStart + i * dx;
+          ctx.lineTo(sx(xi), sy(safePdf(c0.fn, xi)));
+        }
+        ctx.lineTo(sx(x_max), sy(0)); ctx.closePath(); ctx.fill();
       }
-      curveList.forEach(c=>{
-        ctx.strokeStyle=c.color; ctx.lineWidth=2; ctx.setLineDash([]);
-        ctx.beginPath(); let first=true;
-        for(let i=0;i<=STEPS;i++){
-          const x=x_start+i*dx;
-          const yv=safePdf(c.fn,x);
-          const py=sy(Math.min(yv,y_max*1.02));  // 钳制，防止画出边框外
-          first?ctx.moveTo(sx(x),py):ctx.lineTo(sx(x),py);
-          first=false;
+      curveList.forEach(function(c) {
+        ctx.strokeStyle = c.color; ctx.lineWidth = 2; ctx.setLineDash([]);
+        ctx.beginPath();
+        var first = true;
+        for (var i = 0; i <= STEPS; i++) {
+          var xi = xStart + i * dx;
+          var yv = safePdf(c.fn, xi);
+          var py = sy(Math.min(yv, y_max * 1.02));
+          if (first) { ctx.moveTo(sx(xi), py); first = false; }
+          else { ctx.lineTo(sx(xi), py); }
         }
         ctx.stroke();
       });
     }
-    // 图例
-    curveList.forEach((c,i)=>legend(ctx,ml+8,mt+12+i*14,c.color,c.label));
+    curveList.forEach(function(c, i) {
+      legend(ctx, ml + 8, mt + 12 + i * 14, c.color, c.label);
+    });
   }};
 }
 

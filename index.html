@@ -287,6 +287,7 @@ function runTool(name, args) {
     case 'run_normal':       return runNormal(args.mu ?? 0, args.sig ?? 1);
     case 'run_poisson':      return runPoisson(args.lambda ?? 3);
     case 'run_binomial':     return runBinomial(args.n ?? 10, args.p ?? 0.5);
+    case 'run_custom_plot':  return runCustomPlot(args);
     default: return { reply: `未知工具：${name}` };
   }
 }
@@ -540,6 +541,82 @@ function drawGrid(ctx,xE,yE,sx,sy,ml,mt,cw,ch,nx=5,ny=5){
 }
 function dot(ctx,x,y,fill,r=5,stroke='#0d1117'){ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();ctx.strokeStyle=stroke;ctx.lineWidth=1.5;ctx.stroke();}
 function legend(ctx,x,y,color,label,dashed=false){ctx.save();if(dashed)ctx.setLineDash([4,3]);ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+16,y);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='#8b949e';ctx.font='10px JetBrains Mono,monospace';ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(label,x+20,y);ctx.restore();}
+
+// ══════════════════════════════════════════════════════
+// ⑥ 动态绘图（DeepSeek 生成 PDF/PMF 代码，前端执行）
+// ══════════════════════════════════════════════════════
+
+// 辅助数学函数（供 DeepSeek 生成的代码调用）
+function gamma(n) {
+  if (n < 0.5) return Math.PI / (Math.sin(Math.PI * n) * gamma(1 - n));
+  n -= 1;
+  const g = 7;
+  const c = [0.99999999999980993,676.5203681218851,-1259.1392167224028,
+    771.32342877765313,-176.61502916214059,12.507343278686905,
+    -0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  let x = c[0];
+  for (let i = 1; i < g + 2; i++) x += c[i] / (n + i);
+  const t = n + g + 0.5;
+  return Math.sqrt(2 * Math.PI) * Math.pow(t, n + 0.5) * Math.exp(-t) * x;
+}
+function lnGamma(n) {
+  if (n < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * n)) - lnGamma(1 - n);
+  n -= 1;
+  const g = 7;
+  const c = [0.99999999999980993,676.5203681218851,-1259.1392167224028,
+    771.32342877765313,-176.61502916214059,12.507343278686905,
+    -0.13857109526572012,9.9843695780195716e-6,1.5056327351493116e-7];
+  let x = c[0];
+  for (let i = 1; i < g + 2; i++) x += c[i] / (n + i);
+  const t = n + g + 0.5;
+  return 0.5*Math.log(2*Math.PI) + (n+0.5)*Math.log(t) - t + Math.log(x);
+}
+function betaFn(a,b){return gamma(a)*gamma(b)/gamma(a+b);}
+
+function runCustomPlot(args) {
+  const {title, info='', plot_type='curve', x_min, x_max, y_max, pdf_js, description=''} = args;
+  let pdfFn;
+  try {
+    pdfFn = new Function('x','gamma','lnGamma','betaFn', pdf_js);
+  } catch(e) {
+    return {reply: `已调用统计CLI：\n动态绘图代码编译失败：${e.message}`};
+  }
+  const safePdf = (x) => {
+    try { const v=pdfFn(x,gamma,lnGamma,betaFn); return isFinite(v)&&v>=0?v:0; } catch{return 0;}
+  };
+  const reply = `已调用统计CLI：\n${title}\n${description}`;
+  return {reply, draw:()=>{
+    setupViz(title, info||'');
+    const {ctx,ml,mt,cw,ch}=getCtx();
+    const sx=mkS([x_min,x_max],ml,cw), sy=mkSY([0,y_max],mt,ch);
+    drawGrid(ctx,[x_min,x_max],[0,y_max],sx,sy,ml,mt,cw,ch,8,5);
+    if(plot_type==='bars'){
+      const steps=Math.min(Math.round(x_max-x_min)+1,30);
+      const bw=cw/(steps+1);
+      for(let k=0;k<=steps;k++){
+        const x=x_min+k, p=safePdf(x), bh=(p/y_max)*ch, bx=ml+(k+0.5)*bw;
+        ctx.fillStyle='#bc8cff88'; ctx.fillRect(bx-bw*0.35,mt+ch-bh,bw*0.7,bh);
+        ctx.strokeStyle='#bc8cff'; ctx.lineWidth=1; ctx.strokeRect(bx-bw*0.35,mt+ch-bh,bw*0.7,bh);
+        ctx.fillStyle='#8b949e'; ctx.font='9px JetBrains Mono,monospace';
+        ctx.textAlign='center'; ctx.fillText(x,bx,mt+ch+14);
+      }
+    } else {
+      const steps=400, dx=(x_max-x_min)/steps;
+      ctx.fillStyle='#bc8cff15'; ctx.beginPath(); ctx.moveTo(sx(x_min),sy(0));
+      for(let i=0;i<=steps;i++){const x=x_min+i*dx; ctx.lineTo(sx(x),sy(safePdf(x)));}
+      ctx.lineTo(sx(x_max),sy(0)); ctx.closePath(); ctx.fill();
+      ctx.strokeStyle='#bc8cff'; ctx.lineWidth=2.5; ctx.setLineDash([]);
+      ctx.beginPath(); let first=true;
+      for(let i=0;i<=steps;i++){
+        const x=x_min+i*dx, y=sy(safePdf(x));
+        first?ctx.moveTo(sx(x),y):ctx.lineTo(sx(x),y); first=false;
+      }
+      ctx.stroke();
+    }
+    legend(ctx,ml+8,mt+12,'#bc8cff',title);
+  }};
+}
+
 function mean(arr){return arr.reduce((a,b)=>a+b,0)/arr.length;}
 
 // ── Init ──────────────────────────────────────────────

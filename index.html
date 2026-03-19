@@ -3,26 +3,26 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CLI-Anything · 统计工具台</title>
+  <title>CLI-Anything · 统计多工具台</title>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
   <style>
     :root {
-      --bg:        #0d1117;
-      --panel:     #161b22;
-      --border:    #30363d;
-      --accent:    #f0883e;
-      --accent2:   #58a6ff;
-      --text:      #e6edf3;
-      --muted:     #8b949e;
-      --user-bg:   #1c2433;
-      --bot-bg:    #1a2233;
-      --radius:    10px;
-      --font-ui:   'Noto Serif SC', serif;
-      --font-mono: 'JetBrains Mono', monospace;
+      --bg:       #0d1117;
+      --panel:    #161b22;
+      --border:   #30363d;
+      --accent:   #f0883e;
+      --accent2:  #58a6ff;
+      --green:    #3fb950;
+      --purple:   #bc8cff;
+      --pink:     #ff7b72;
+      --yellow:   #e3b341;
+      --text:     #e6edf3;
+      --muted:    #8b949e;
+      --radius:   10px;
+      --font-ui:  'Noto Serif SC', serif;
+      --font-mono:'JetBrains Mono', monospace;
     }
-
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       background: var(--bg);
       color: var(--text);
@@ -33,11 +33,10 @@
       align-items: center;
     }
 
-    /* ── Header ── */
     header {
       width: 100%;
-      max-width: 780px;
-      padding: 36px 24px 0;
+      max-width: 860px;
+      padding: 30px 24px 0;
     }
     .header-tag {
       font-family: var(--font-mono);
@@ -47,158 +46,153 @@
       text-transform: uppercase;
       margin-bottom: 6px;
     }
-    h1 {
-      font-size: clamp(22px, 4vw, 32px);
-      font-weight: 700;
-      color: var(--text);
-      line-height: 1.25;
-    }
+    h1 { font-size: clamp(20px, 3.5vw, 30px); font-weight: 700; line-height: 1.25; }
     h1 span { color: var(--accent); }
-    .subtitle {
-      margin-top: 8px;
-      font-size: 13px;
-      color: var(--muted);
-      font-family: var(--font-mono);
-    }
-    .divider {
-      margin: 20px 0 0;
-      border: none;
-      border-top: 1px solid var(--border);
-    }
+    .subtitle { margin-top: 6px; font-size: 12px; color: var(--muted); font-family: var(--font-mono); }
+    hr.divider { margin: 16px 0 0; border: none; border-top: 1px solid var(--border); }
 
-    /* ── Chat window ── */
-    main {
-      flex: 1;
+    .tool-tabs {
       width: 100%;
-      max-width: 780px;
-      padding: 0 24px 24px;
+      max-width: 860px;
+      padding: 14px 24px 0;
       display: flex;
-      flex-direction: column;
-      gap: 0;
-    }
-
-    #chat-box {
-      flex: 1;
-      min-height: 360px;
-      max-height: 54vh;
-      overflow-y: auto;
-      padding: 20px 0;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      scrollbar-width: thin;
-      scrollbar-color: var(--border) transparent;
-    }
-
-    .bubble {
-      display: flex;
-      flex-direction: column;
-      max-width: 88%;
-      padding: 12px 16px;
-      border-radius: var(--radius);
-      font-size: 14px;
-      line-height: 1.7;
-      animation: fadeUp .25s ease both;
-    }
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(8px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    .bubble.user {
-      align-self: flex-end;
-      background: var(--user-bg);
-      border: 1px solid var(--border);
-    }
-    .bubble.bot {
-      align-self: flex-start;
-      background: var(--bot-bg);
-      border: 1px solid var(--border);
-    }
-
-    .bubble-label {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      letter-spacing: .1em;
-      margin-bottom: 5px;
-    }
-    .bubble.user .bubble-label { color: var(--accent2); }
-    .bubble.bot  .bubble-label { color: var(--accent); }
-
-    /* code blocks inside bot replies */
-    .bubble.bot pre {
-      background: #0d1117;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      padding: 10px 14px;
-      margin-top: 8px;
-      font-family: var(--font-mono);
-      font-size: 13px;
-      white-space: pre-wrap;
-      color: #79c0ff;
-    }
-
-    /* ── Chart area ── */
-    #chart-wrap {
-      display: none;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 18px 20px 14px;
-      margin-bottom: 16px;
-      animation: fadeUp .3s ease both;
-    }
-    #chart-wrap h2 {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      letter-spacing: .12em;
-      color: var(--accent);
-      text-transform: uppercase;
-      margin-bottom: 12px;
-    }
-    #reg-canvas {
-      width: 100%;
-      height: 220px;
-      display: block;
-    }
-    #chart-info {
-      margin-top: 10px;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      color: var(--muted);
-      display: flex;
-      gap: 24px;
-    }
-    #chart-info span { color: var(--text); }
-
-    /* ── Input bar ── */
-    .input-row {
-      display: flex;
-      gap: 10px;
-      align-items: flex-end;
-      border-top: 1px solid var(--border);
-      padding-top: 16px;
-    }
-
-    .hint-chips {
-      display: flex;
-      gap: 8px;
+      gap: 6px;
       flex-wrap: wrap;
-      margin-bottom: 10px;
     }
-    .chip {
+    .tab {
       font-family: var(--font-mono);
       font-size: 11px;
-      padding: 4px 10px;
+      padding: 5px 14px;
       border-radius: 20px;
       border: 1px solid var(--border);
       color: var(--muted);
       cursor: pointer;
       background: transparent;
-      transition: border-color .18s, color .18s;
+      transition: all .18s;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .tab .dot { width: 6px; height: 6px; border-radius: 50%; }
+    .tab[data-tool="regression"]   .dot { background: var(--accent); }
+    .tab[data-tool="logistic"]     .dot { background: var(--green); }
+    .tab[data-tool="discriminant"] .dot { background: var(--purple); }
+    .tab[data-tool="kmeans"]       .dot { background: var(--pink); }
+    .tab[data-tool="probability"]  .dot { background: var(--yellow); }
+    .tab[data-tool="regression"].active   { color: var(--accent);  border-color: var(--accent); }
+    .tab[data-tool="logistic"].active     { color: var(--green);   border-color: var(--green); }
+    .tab[data-tool="discriminant"].active { color: var(--purple);  border-color: var(--purple); }
+    .tab[data-tool="kmeans"].active       { color: var(--pink);    border-color: var(--pink); }
+    .tab[data-tool="probability"].active  { color: var(--yellow);  border-color: var(--yellow); }
+
+    main {
+      flex: 1;
+      width: 100%;
+      max-width: 860px;
+      padding: 0 24px 24px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    #viz-wrap {
+      display: none;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px 18px 12px;
+      margin-top: 14px;
+      animation: fadeUp .3s ease both;
+    }
+    #viz-wrap h2 {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      letter-spacing: .12em;
+      color: var(--accent);
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+    #viz-canvas { width: 100%; height: 240px; display: block; }
+    #viz-info {
+      margin-top: 10px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+    #viz-info span { color: var(--text); }
+
+    #chat-box {
+      min-height: 280px;
+      max-height: 42vh;
+      overflow-y: auto;
+      padding: 16px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+      margin-top: 4px;
+    }
+    .bubble {
+      display: flex;
+      flex-direction: column;
+      max-width: 90%;
+      padding: 11px 15px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      line-height: 1.7;
+      animation: fadeUp .22s ease both;
+    }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(7px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .bubble.user { align-self: flex-end; background: #1c2433; border: 1px solid var(--border); }
+    .bubble.bot  { align-self: flex-start; background: #1a2233; border: 1px solid var(--border); }
+    .bubble-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; margin-bottom: 4px; }
+    .bubble.user .bubble-label { color: var(--accent2); }
+    .bubble.bot  .bubble-label { color: var(--accent); }
+    .bubble.bot pre {
+      background: #0d1117;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 13px;
+      margin-top: 8px;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      white-space: pre-wrap;
+      color: #79c0ff;
+    }
+
+    .hint-chips {
+      display: flex;
+      gap: 7px;
+      flex-wrap: wrap;
+      margin-top: 12px;
+      margin-bottom: 10px;
+    }
+    .chip {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 4px 11px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      cursor: pointer;
+      background: transparent;
+      transition: all .16s;
     }
     .chip:hover { border-color: var(--accent); color: var(--accent); }
 
+    .input-row {
+      display: flex;
+      gap: 9px;
+      align-items: flex-end;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+    }
     #user-input {
       flex: 1;
       background: var(--panel);
@@ -207,14 +201,13 @@
       color: var(--text);
       font-family: var(--font-ui);
       font-size: 14px;
-      padding: 11px 14px;
+      padding: 10px 13px;
       resize: none;
       outline: none;
-      transition: border-color .18s;
+      transition: border-color .16s;
       line-height: 1.5;
     }
     #user-input:focus { border-color: var(--accent2); }
-
     #send-btn {
       background: var(--accent);
       border: none;
@@ -223,9 +216,9 @@
       font-family: var(--font-mono);
       font-size: 13px;
       font-weight: 600;
-      padding: 11px 22px;
+      padding: 10px 20px;
       cursor: pointer;
-      transition: opacity .18s, transform .12s;
+      transition: opacity .16s, transform .11s;
       white-space: nowrap;
     }
     #send-btn:hover   { opacity: .88; }
@@ -234,8 +227,8 @@
 
     footer {
       width: 100%;
-      max-width: 780px;
-      padding: 10px 24px 24px;
+      max-width: 860px;
+      padding: 8px 24px 20px;
       font-size: 11px;
       color: var(--muted);
       font-family: var(--font-mono);
@@ -245,261 +238,468 @@
 <body>
 
 <header>
-  <p class="header-tag">CLI-Anything · 练习项目</p>
-  <h1>统计工具台 <span>/ Linear Regression</span></h1>
+  <p class="header-tag">CLI-Anything · 多工具练习项目</p>
+  <h1>统计多工具台 <span>/ Statistical CLI Suite</span></h1>
   <p class="subtitle">天津财经大学统计学院教授　龚凤乾</p>
   <hr class="divider" />
 </header>
 
+<div class="tool-tabs">
+  <button class="tab active" data-tool="regression"><span class="dot"></span>线性回归</button>
+  <button class="tab" data-tool="logistic"><span class="dot"></span>逻辑分类</button>
+  <button class="tab" data-tool="discriminant"><span class="dot"></span>线性判别</button>
+  <button class="tab" data-tool="kmeans"><span class="dot"></span>K-均值聚类</button>
+  <button class="tab" data-tool="probability"><span class="dot"></span>概率计算</button>
+</div>
+
 <main>
-  <!-- Chart (shown after regression) -->
-  <div id="chart-wrap">
-    <h2>拟合结果可视化</h2>
-    <canvas id="reg-canvas"></canvas>
-    <div id="chart-info">
-      斜率 b₁：<span id="ci-slope">—</span>
-      &nbsp;截距 b₀：<span id="ci-int">—</span>
-      &nbsp;R²：<span id="ci-r2">—</span>
-    </div>
+  <div id="viz-wrap">
+    <h2 id="viz-title">可视化结果</h2>
+    <canvas id="viz-canvas"></canvas>
+    <div id="viz-info"></div>
   </div>
 
-  <!-- Chat -->
   <div id="chat-box"></div>
 
-  <!-- Hint chips -->
-  <div class="hint-chips">
-    <button class="chip" onclick="fillInput('拟合一条直线')">拟合一条直线</button>
-    <button class="chip" onclick="fillInput('帮我做线性回归')">线性回归</button>
-    <button class="chip" onclick="fillInput('你支持什么功能？')">支持什么功能？</button>
-  </div>
+  <div class="hint-chips" id="hint-chips"></div>
 
-  <!-- Input -->
   <div class="input-row">
     <textarea id="user-input" rows="2" placeholder="输入消息，回车发送…"></textarea>
     <button id="send-btn" onclick="sendMessage()">发送</button>
   </div>
 </main>
 
-<footer>CLI-Anything · Netlify Functions · DeepSeek API（模拟）</footer>
+<footer>CLI-Anything · 统计算法前端内置 · 天津财经大学统计学院</footer>
 
-<!-- Lightweight chart (no external lib) -->
 <script>
-  // ── Utility ──────────────────────────────────────────
-  const chatBox   = document.getElementById('chat-box');
-  const inputEl   = document.getElementById('user-input');
-  const sendBtn   = document.getElementById('send-btn');
-  const chartWrap = document.getElementById('chart-wrap');
-  const canvas    = document.getElementById('reg-canvas');
+// ── State ─────────────────────────────────────────────
+let currentTool = 'regression';
 
-  function fillInput(text) {
-    inputEl.value = text;
-    inputEl.focus();
-  }
+const TOOLS = {
+  regression:   { label:'线性回归',   color:'#f0883e', chips:['拟合一条直线','最小二乘回归','线性回归'],       keywords:['回归','直线','拟合','最小二乘'] },
+  logistic:     { label:'逻辑分类',   color:'#3fb950', chips:['逻辑回归分类','二分类预测','sigmoid'],          keywords:['逻辑','分类','logistic','二分类','sigmoid'] },
+  discriminant: { label:'线性判别',   color:'#bc8cff', chips:['LDA判别分析','线性判别','Fisher判别'],          keywords:['判别','lda','fisher','discriminant'] },
+  kmeans:       { label:'K-均值聚类', color:'#ff7b72', chips:['K均值聚类 K=3','K=2聚类','聚类分析'],          keywords:['聚类','kmeans','k均值','cluster','k='] },
+  probability:  { label:'概率计算',   color:'#e3b341', chips:['正态分布概率','泊松分布 λ=3','二项分布 n=10 p=0.4'], keywords:['概率','正态','泊松','二项','分布','normal','poisson','binomial'] },
+};
 
-  inputEl.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+// ── DOM ───────────────────────────────────────────────
+const chatBox   = document.getElementById('chat-box');
+const inputEl   = document.getElementById('user-input');
+const sendBtn   = document.getElementById('send-btn');
+const vizWrap   = document.getElementById('viz-wrap');
+const vizCanvas = document.getElementById('viz-canvas');
+const vizTitle  = document.getElementById('viz-title');
+const vizInfo   = document.getElementById('viz-info');
+const hintChips = document.getElementById('hint-chips');
+
+// ── Tabs ──────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    currentTool = tab.dataset.tool;
+    renderChips();
+    vizWrap.style.display = 'none';
+    const tips = { regression:'拟合一条直线', logistic:'逻辑回归分类', discriminant:'LDA判别分析', kmeans:'K均值聚类', probability:'正态分布概率 / 泊松分布 λ=3 / 二项分布 n=10 p=0.5' };
+    addBubble('bot', `已切换至 <strong>${TOOLS[currentTool].label}</strong>。<br><em style="color:var(--muted)">试试：${tips[currentTool]}</em>`);
   });
+});
 
-  // ── Chat bubbles ──────────────────────────────────────
-  function addBubble(role, html) {
-    const wrap  = document.createElement('div');
-    wrap.className = `bubble ${role}`;
-    const label = document.createElement('div');
-    label.className = 'bubble-label';
-    label.textContent = role === 'user' ? 'YOU' : 'CLI-AGENT';
-    wrap.appendChild(label);
-    const body = document.createElement('div');
-    body.innerHTML = html;
-    wrap.appendChild(body);
-    chatBox.appendChild(wrap);
-    chatBox.scrollTop = chatBox.scrollHeight;
-    return wrap;
-  }
-
-  // ── Mock chat.js（与 Netlify Functions 版本逻辑完全一致）────
-  function mockChatHandler(msg) {
-    let reply = '';
-    if (msg.includes('回归') || msg.includes('直线')) {
-      const result = linearRegression({ x: [1,2,3,4], y: [2,4,5,8] });
-      reply = `已调用统计CLI：\n斜率 = ${result.slope.toFixed(2)}\n截距 = ${result.intercept.toFixed(2)}`;
-    } else {
-      reply = '我目前支持：线性回归（试试说：拟合一条直线）';
-    }
-    return { reply };
-  }
-
-  function linearRegression(data) {
-    const x = data.x, y = data.y, n = x.length;
-    const xMean = x.reduce((a,b)=>a+b)/n;
-    const yMean = y.reduce((a,b)=>a+b)/n;
-    let num = 0, den = 0;
-    for (let i = 0; i < n; i++) {
-      num += (x[i]-xMean)*(y[i]-yMean);
-      den += (x[i]-xMean)**2;
-    }
-    const slope = num / den;
-    const intercept = yMean - slope * xMean;
-    return { slope, intercept };
-  }
-
-  // ── Send ──────────────────────────────────────────────
-  async function sendMessage() {
-    const msg = inputEl.value.trim();
-    if (!msg) return;
-    inputEl.value = '';
-    sendBtn.disabled = true;
-
-    addBubble('user', escHtml(msg));
-    const thinkBubble = addBubble('bot', '<em style="color:var(--muted)">工具调用中…</em>');
-
-    // 模拟网络延迟，体现 CLI 调用感
-    await new Promise(r => setTimeout(r, 420));
-
-    const data  = mockChatHandler(msg);
-    const reply = data.reply || '（无回复）';
-    thinkBubble.querySelector('div:last-child').innerHTML = formatReply(reply);
-
-    const slopeMatch = reply.match(/斜率\s*=\s*([\d.\-]+)/);
-    const intMatch   = reply.match(/截距\s*=\s*([\d.\-]+)/);
-    if (slopeMatch && intMatch) {
-      drawChart(parseFloat(slopeMatch[1]), parseFloat(intMatch[1]));
-    }
-
-    sendBtn.disabled = false;
-    inputEl.focus();
-  }
-
-  // ── Format bot reply (wrap code-like block in <pre>) ──
-  function formatReply(text) {
-    // Lines after "已调用统计CLI：" → pre block
-    const parts = text.split('已调用统计CLI：');
-    if (parts.length === 2) {
-      return escHtml('已调用统计CLI：') +
-        `<pre>${escHtml(parts[1].trim())}</pre>`;
-    }
-    return escHtml(text);
-  }
-
-  function escHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  // ── Canvas chart ──────────────────────────────────────
-  // Data points hardcoded to match chat.js demo data
-  const DATA_X = [1, 2, 3, 4];
-  const DATA_Y = [2, 4, 5, 8];
-
-  function drawChart(slope, intercept) {
-    chartWrap.style.display = 'block';
-
-    // Compute R²
-    const n = DATA_X.length;
-    const yMean = DATA_Y.reduce((a,b)=>a+b) / n;
-    const ssTot = DATA_Y.reduce((s,y)=>s+(y-yMean)**2, 0);
-    const ssRes = DATA_X.reduce((s,x,i)=>s+(DATA_Y[i]-(slope*x+intercept))**2, 0);
-    const r2    = 1 - ssRes/ssTot;
-
-    document.getElementById('ci-slope').textContent = slope.toFixed(4);
-    document.getElementById('ci-int').textContent   = intercept.toFixed(4);
-    document.getElementById('ci-r2').textContent    = r2.toFixed(4);
-
-    // HiDPI
-    const dpr = window.devicePixelRatio || 1;
-    const W   = canvas.parentElement.clientWidth - 40;
-    const H   = 220;
-    canvas.style.width  = W + 'px';
-    canvas.style.height = H + 'px';
-    canvas.width  = W * dpr;
-    canvas.height = H * dpr;
-
-    const ctx = canvas.getContext('2d');
-    ctx.scale(dpr, dpr);
-
-    // Margins
-    const ml = 44, mr = 16, mt = 14, mb = 36;
-    const cw = W - ml - mr;
-    const ch = H - mt - mb;
-
-    // Scale
-    const xMin = 0, xMax = 5;
-    const yMin = 0, yMax = 10;
-    const sx = x => ml + (x - xMin) / (xMax - xMin) * cw;
-    const sy = y => mt + ch - (y - yMin) / (yMax - yMin) * ch;
-
-    ctx.clearRect(0, 0, W, H);
-
-    // Grid
-    ctx.strokeStyle = '#21262d';
-    ctx.lineWidth = 1;
-    for (let gx = 0; gx <= 5; gx++) {
-      ctx.beginPath(); ctx.moveTo(sx(gx), mt); ctx.lineTo(sx(gx), mt+ch); ctx.stroke();
-    }
-    for (let gy = 0; gy <= 10; gy+=2) {
-      ctx.beginPath(); ctx.moveTo(ml, sy(gy)); ctx.lineTo(ml+cw, sy(gy)); ctx.stroke();
-    }
-
-    // Axes
-    ctx.strokeStyle = '#30363d';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath(); ctx.moveTo(ml, mt); ctx.lineTo(ml, mt+ch); ctx.lineTo(ml+cw, mt+ch); ctx.stroke();
-
-    // Axis labels
-    ctx.fillStyle = '#8b949e';
-    ctx.font = '11px JetBrains Mono, monospace';
-    ctx.textAlign = 'center';
-    for (let gx = 0; gx <= 5; gx++) {
-      ctx.fillText(gx, sx(gx), mt+ch+18);
-    }
-    ctx.textAlign = 'right';
-    for (let gy = 0; gy <= 10; gy+=2) {
-      ctx.fillText(gy, ml-6, sy(gy)+4);
-    }
-
-    // Regression line
-    const x0 = xMin, x1 = xMax;
-    const y0 = slope*x0+intercept, y1 = slope*x1+intercept;
-    ctx.strokeStyle = '#f0883e';
-    ctx.lineWidth = 2;
-    ctx.setLineDash([]);
-    ctx.beginPath(); ctx.moveTo(sx(x0), sy(y0)); ctx.lineTo(sx(x1), sy(y1)); ctx.stroke();
-
-    // Residual lines
-    ctx.strokeStyle = '#58a6ff44';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3,3]);
-    DATA_X.forEach((x, i) => {
-      const yHat = slope*x+intercept;
-      ctx.beginPath(); ctx.moveTo(sx(x), sy(DATA_Y[i])); ctx.lineTo(sx(x), sy(yHat)); ctx.stroke();
-    });
-    ctx.setLineDash([]);
-
-    // Data points
-    DATA_X.forEach((x, i) => {
-      ctx.beginPath();
-      ctx.arc(sx(x), sy(DATA_Y[i]), 5, 0, Math.PI*2);
-      ctx.fillStyle = '#58a6ff';
-      ctx.fill();
-      ctx.strokeStyle = '#0d1117';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-    });
-
-    // Legend
-    ctx.font = '11px JetBrains Mono, monospace';
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#f0883e';
-    ctx.fillRect(ml+8, mt+6, 18, 2);
-    ctx.fillStyle = '#8b949e';
-    ctx.fillText(`ŷ = ${slope.toFixed(2)}x + ${intercept.toFixed(2)}`, ml+30, mt+12);
-  }
-
-  // ── Welcome message ───────────────────────────────────
-  window.addEventListener('DOMContentLoaded', () => {
-    addBubble('bot',
-      '欢迎使用 <strong>CLI-Anything 统计工具台</strong>。<br>' +
-      '试试点击下方提示词，或直接输入：<em>拟合一条直线</em>'
-    );
+function renderChips() {
+  hintChips.innerHTML = '';
+  TOOLS[currentTool].chips.forEach(c => {
+    const btn = document.createElement('button');
+    btn.className = 'chip';
+    btn.textContent = c;
+    btn.onclick = () => { inputEl.value = c; inputEl.focus(); };
+    hintChips.appendChild(btn);
   });
+}
+
+inputEl.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+});
+
+// ── Chat ──────────────────────────────────────────────
+function addBubble(role, html) {
+  const wrap  = document.createElement('div');
+  wrap.className = `bubble ${role}`;
+  const label = document.createElement('div');
+  label.className = 'bubble-label';
+  label.textContent = role === 'user' ? 'YOU' : 'CLI-AGENT';
+  wrap.appendChild(label);
+  const body = document.createElement('div');
+  body.innerHTML = html;
+  wrap.appendChild(body);
+  chatBox.appendChild(wrap);
+  chatBox.scrollTop = chatBox.scrollHeight;
+  return wrap;
+}
+
+function escHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function formatReply(text) {
+  const marker = '已调用统计CLI：';
+  const idx = text.indexOf(marker);
+  if (idx !== -1) {
+    return escHtml(text.slice(0, idx + marker.length)) + `<pre>${escHtml(text.slice(idx + marker.length).trim())}</pre>`;
+  }
+  return escHtml(text);
+}
+
+// ── Send ──────────────────────────────────────────────
+async function sendMessage() {
+  const msg = inputEl.value.trim();
+  if (!msg) return;
+  inputEl.value = '';
+  sendBtn.disabled = true;
+
+  // Auto-detect tool
+  for (const [tool, cfg] of Object.entries(TOOLS)) {
+    if (cfg.keywords.some(kw => msg.toLowerCase().includes(kw))) {
+      if (tool !== currentTool) {
+        currentTool = tool;
+        document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tool === tool));
+        renderChips();
+      }
+      break;
+    }
+  }
+
+  addBubble('user', escHtml(msg));
+  const thinkBubble = addBubble('bot', '<em style="color:var(--muted)">工具调用中…</em>');
+  await new Promise(r => setTimeout(r, 380));
+
+  const result = dispatch(msg);
+  thinkBubble.querySelector('div:last-child').innerHTML = formatReply(result.reply);
+  if (result.draw) result.draw();
+
+  sendBtn.disabled = false;
+  inputEl.focus();
+}
+
+// ── Dispatcher ────────────────────────────────────────
+function dispatch(msg) {
+  const m = msg.toLowerCase();
+  if (TOOLS.regression.keywords.some(k => m.includes(k)))   return runRegression();
+  if (TOOLS.logistic.keywords.some(k => m.includes(k)))     return runLogistic();
+  if (TOOLS.discriminant.keywords.some(k => m.includes(k))) return runDiscriminant();
+  if (TOOLS.kmeans.keywords.some(k => m.includes(k)))       return runKMeans(msg);
+  if (TOOLS.probability.keywords.some(k => m.includes(k)))  return runProbability(msg);
+  if (currentTool !== 'regression') return dispatch(TOOLS[currentTool].chips[0]);
+  return { reply: '我支持：线性回归、逻辑分类、线性判别、K-均值聚类、概率计算。\n请选择上方标签或描述您的需求。' };
+}
+
+// ══════════════════════════════════════════════════════
+// ① 线性回归
+// ══════════════════════════════════════════════════════
+function runRegression() {
+  const X = [1,2,3,4,5,6], Y = [2.1,3.9,5.3,7.8,9.2,11.1];
+  const n=X.length, xm=mean(X), ym=mean(Y);
+  let num=0,den=0;
+  for(let i=0;i<n;i++){num+=(X[i]-xm)*(Y[i]-ym);den+=(X[i]-xm)**2;}
+  const b1=num/den, b0=ym-b1*xm;
+  const yHat=X.map(x=>b1*x+b0);
+  const ssTot=Y.reduce((s,y)=>s+(y-ym)**2,0);
+  const ssRes=Y.reduce((s,y,i)=>s+(y-yHat[i])**2,0);
+  const r2=1-ssRes/ssTot, se=Math.sqrt(ssRes/(n-2));
+  const reply=`已调用统计CLI：\n斜率 b₁  = ${b1.toFixed(4)}\n截距 b₀  = ${b0.toFixed(4)}\nR²       = ${r2.toFixed(4)}\n标准误差  = ${se.toFixed(4)}\n样本量 n  = ${n}`;
+  return { reply, draw:()=>drawRegression(X,Y,b1,b0,r2) };
+}
+
+function drawRegression(X,Y,b1,b0,r2) {
+  setupViz('线性回归 · 散点图 + 拟合直线', `斜率 b₁：<span>${b1.toFixed(4)}</span> &nbsp; 截距 b₀：<span>${b0.toFixed(4)}</span> &nbsp; R²：<span>${r2.toFixed(4)}</span>`);
+  const {ctx,ml,mt,cw,ch}=getCtx();
+  const xE=[0,7],yE=[0,13], sx=mkS(xE,ml,cw), sy=mkSY(yE,mt,ch);
+  drawGrid(ctx,xE,yE,sx,sy,ml,mt,cw,ch);
+  ctx.strokeStyle='#f0883e';ctx.lineWidth=2;ctx.setLineDash([]);
+  ctx.beginPath();ctx.moveTo(sx(0),sy(b0));ctx.lineTo(sx(7),sy(b1*7+b0));ctx.stroke();
+  ctx.strokeStyle='#58a6ff33';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+  X.forEach((x,i)=>{ctx.beginPath();ctx.moveTo(sx(x),sy(Y[i]));ctx.lineTo(sx(x),sy(b1*x+b0));ctx.stroke();});
+  ctx.setLineDash([]);
+  X.forEach((x,i)=>dot(ctx,sx(x),sy(Y[i]),'#58a6ff'));
+  legend(ctx,ml+8,mt+12,'#f0883e',`ŷ=${b1.toFixed(2)}x+${b0.toFixed(2)}`);
+}
+
+// ══════════════════════════════════════════════════════
+// ② 逻辑分类（梯度下降 Logistic Regression）
+// ══════════════════════════════════════════════════════
+function sigmoid(z){return 1/(1+Math.exp(-z));}
+
+function runLogistic() {
+  const data=[
+    {x1:1.2,x2:0.8,y:0},{x1:1.5,x2:1.1,y:0},{x1:0.9,x2:0.6,y:0},
+    {x1:1.0,x2:1.4,y:0},{x1:1.8,x2:0.5,y:0},{x1:0.7,x2:0.9,y:0},
+    {x1:3.1,x2:2.8,y:1},{x1:3.5,x2:3.2,y:1},{x1:2.9,x2:3.0,y:1},
+    {x1:3.3,x2:2.5,y:1},{x1:2.8,x2:3.4,y:1},{x1:3.7,x2:2.9,y:1},
+  ];
+  let w1=0,w2=0,b=0;
+  for(let e=0;e<400;e++){
+    let dw1=0,dw2=0,db=0;
+    data.forEach(d=>{const err=sigmoid(w1*d.x1+w2*d.x2+b)-d.y;dw1+=err*d.x1;dw2+=err*d.x2;db+=err;});
+    w1-=0.3*dw1/data.length;w2-=0.3*dw2/data.length;b-=0.3*db/data.length;
+  }
+  const acc=data.filter(d=>(sigmoid(w1*d.x1+w2*d.x2+b)>=0.5?1:0)===d.y).length/data.length;
+  const reply=`已调用统计CLI：\n算法     = Logistic Regression（梯度下降）\n权重 w₁  = ${w1.toFixed(4)}\n权重 w₂  = ${w2.toFixed(4)}\n偏置 b   = ${b.toFixed(4)}\n训练准确率 = ${(acc*100).toFixed(1)}%\n样本量 n  = ${data.length}`;
+  return { reply, draw:()=>drawLogistic(data,w1,w2,b,acc) };
+}
+
+function drawLogistic(data,w1,w2,b,acc) {
+  setupViz('逻辑分类 · 决策边界',`准确率：<span>${(acc*100).toFixed(1)}%</span>`);
+  const {ctx,ml,mt,cw,ch}=getCtx();
+  const xE=[0,5],yE=[0,5],sx=mkS(xE,ml,cw),sy=mkSY(yE,mt,ch);
+  drawGrid(ctx,xE,yE,sx,sy,ml,mt,cw,ch);
+  if(Math.abs(w2)>1e-6){
+    ctx.strokeStyle='#e3b341';ctx.lineWidth=1.5;ctx.setLineDash([5,4]);
+    ctx.beginPath();ctx.moveTo(sx(0),sy(-(w1*0+b)/w2));ctx.lineTo(sx(5),sy(-(w1*5+b)/w2));ctx.stroke();ctx.setLineDash([]);
+  }
+  data.forEach(d=>dot(ctx,sx(d.x1),sy(d.x2),d.y===0?'#58a6ff':'#ff7b72'));
+  legend(ctx,ml+8,mt+12,'#58a6ff','类别 0');
+  legend(ctx,ml+8,mt+26,'#ff7b72','类别 1');
+  legend(ctx,ml+8,mt+40,'#e3b341','决策边界',true);
+}
+
+// ══════════════════════════════════════════════════════
+// ③ 线性判别分析（LDA / Fisher）
+// ══════════════════════════════════════════════════════
+function runDiscriminant() {
+  const c0=[[2.0,1.8],[2.5,2.1],[1.8,2.3],[2.2,1.5],[2.8,2.0]];
+  const c1=[[4.5,4.2],[4.8,4.5],[4.2,4.8],[5.0,4.0],[4.6,4.7]];
+  const m0=[mean(c0.map(p=>p[0])),mean(c0.map(p=>p[1]))];
+  const m1=[mean(c1.map(p=>p[0])),mean(c1.map(p=>p[1]))];
+  const sw=[[0,0],[0,0]];
+  [c0,c1].forEach((cls,ci)=>{
+    const mu=ci===0?m0:m1;
+    cls.forEach(p=>{sw[0][0]+=(p[0]-mu[0])**2;sw[0][1]+=(p[0]-mu[0])*(p[1]-mu[1]);sw[1][0]+=(p[1]-mu[1])*(p[0]-mu[0]);sw[1][1]+=(p[1]-mu[1])**2;});
+  });
+  const det=sw[0][0]*sw[1][1]-sw[0][1]*sw[1][0];
+  const swInv=[[sw[1][1]/det,-sw[0][1]/det],[-sw[1][0]/det,sw[0][0]/det]];
+  const dm=[m1[0]-m0[0],m1[1]-m0[1]];
+  const w=[swInv[0][0]*dm[0]+swInv[0][1]*dm[1],swInv[1][0]*dm[0]+swInv[1][1]*dm[1]];
+  const wn=norm2(w);
+  const thresh=w[0]*(m0[0]+m1[0])/2+w[1]*(m0[1]+m1[1])/2;
+  const all=c0.map(p=>({p,y:0})).concat(c1.map(p=>({p,y:1})));
+  const acc=all.filter(({p,y})=>(w[0]*p[0]+w[1]*p[1]>=thresh?1:0)===y).length/all.length;
+  const reply=`已调用统计CLI：\n算法       = Fisher 线性判别分析（LDA）\n判别方向 w = [${wn[0].toFixed(3)}, ${wn[1].toFixed(3)}]\n类均值 μ₀  = [${m0.map(v=>v.toFixed(2)).join(', ')}]\n类均值 μ₁  = [${m1.map(v=>v.toFixed(2)).join(', ')}]\n判别准确率 = ${(acc*100).toFixed(1)}%`;
+  return { reply, draw:()=>drawLDA(c0,c1,w,thresh,m0,m1,acc) };
+}
+
+function norm2(w){const n=Math.sqrt(w[0]**2+w[1]**2);return[w[0]/n,w[1]/n];}
+
+function drawLDA(c0,c1,w,thresh,m0,m1,acc) {
+  setupViz('线性判别 LDA · 判别边界',`准确率：<span>${(acc*100).toFixed(1)}%</span>`);
+  const {ctx,ml,mt,cw,ch}=getCtx();
+  const xE=[0,7],yE=[0,7],sx=mkS(xE,ml,cw),sy=mkSY(yE,mt,ch);
+  drawGrid(ctx,xE,yE,sx,sy,ml,mt,cw,ch);
+  if(Math.abs(w[1])>1e-6){
+    ctx.strokeStyle='#bc8cff';ctx.lineWidth=1.5;ctx.setLineDash([5,4]);
+    ctx.beginPath();ctx.moveTo(sx(0),sy((thresh-w[0]*0)/w[1]));ctx.lineTo(sx(7),sy((thresh-w[0]*7)/w[1]));ctx.stroke();ctx.setLineDash([]);
+  }
+  c0.forEach(p=>dot(ctx,sx(p[0]),sy(p[1]),'#58a6ff'));
+  c1.forEach(p=>dot(ctx,sx(p[0]),sy(p[1]),'#ff7b72'));
+  dot(ctx,sx(m0[0]),sy(m0[1]),'#58a6ff',8,'#fff');
+  dot(ctx,sx(m1[0]),sy(m1[1]),'#ff7b72',8,'#fff');
+  legend(ctx,ml+8,mt+12,'#58a6ff','类别 0');
+  legend(ctx,ml+8,mt+26,'#ff7b72','类别 1');
+  legend(ctx,ml+8,mt+40,'#bc8cff','判别边界',true);
+}
+
+// ══════════════════════════════════════════════════════
+// ④ K-均值聚类
+// ══════════════════════════════════════════════════════
+function randn(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+
+function runKMeans(msg) {
+  const km=msg.match(/k\s*[=＝]\s*(\d)/i);
+  const K=km?Math.min(5,parseInt(km[1])):3;
+  const centers=[[1.5,1.5],[4,4],[7,2],[2,6],[6,6]].slice(0,K);
+  const data=[];
+  centers.forEach((c,ci)=>{for(let i=0;i<8;i++)data.push({x:c[0]+randn()*0.7,y:c[1]+randn()*0.7});});
+  let cents=centers.map(c=>[...c]);
+  let labels=new Array(data.length).fill(0);
+  for(let it=0;it<20;it++){
+    labels=data.map(p=>{let best=0,bd=Infinity;cents.forEach((c,ci)=>{const d=(p.x-c[0])**2+(p.y-c[1])**2;if(d<bd){bd=d;best=ci;}});return best;});
+    cents=cents.map((_,ci)=>{const pts=data.filter((_,i)=>labels[i]===ci);return pts.length?[mean(pts.map(p=>p.x)),mean(pts.map(p=>p.y))]:cents[ci];});
+  }
+  const inertia=data.reduce((s,p,i)=>s+(p.x-cents[labels[i]][0])**2+(p.y-cents[labels[i]][1])**2,0);
+  const reply=`已调用统计CLI：\n算法     = K-Means（Lloyd 迭代）\nK        = ${K}\n`+
+    cents.map((c,i)=>`质心 C${i+1}  = [${c[0].toFixed(2)}, ${c[1].toFixed(2)}]`).join('\n')+
+    `\n簇内惯性  = ${inertia.toFixed(4)}\n样本量 n  = ${data.length}`;
+  return { reply, draw:()=>drawKMeans(data,labels,cents,K) };
+}
+
+const CCOLORS=['#58a6ff','#ff7b72','#3fb950','#e3b341','#bc8cff'];
+
+function drawKMeans(data,labels,cents,K) {
+  setupViz(`K-均值聚类 · K=${K}`,cents.map((c,i)=>`C${i+1}：<span>[${c[0].toFixed(2)},${c[1].toFixed(2)}]</span>`).join(' &nbsp; '));
+  const {ctx,ml,mt,cw,ch}=getCtx();
+  const xE=[0,9],yE=[0,9],sx=mkS(xE,ml,cw),sy=mkSY(yE,mt,ch);
+  drawGrid(ctx,xE,yE,sx,sy,ml,mt,cw,ch);
+  data.forEach((p,i)=>dot(ctx,sx(p.x),sy(p.y),CCOLORS[labels[i]]));
+  cents.forEach((c,ci)=>{
+    ctx.beginPath();ctx.arc(sx(c[0]),sy(c[1]),9,0,Math.PI*2);
+    ctx.fillStyle=CCOLORS[ci];ctx.globalAlpha=0.22;ctx.fill();ctx.globalAlpha=1;
+    ctx.strokeStyle=CCOLORS[ci];ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(sx(c[0]),sy(c[1]),7,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle='#fff';ctx.font='bold 9px JetBrains Mono,monospace';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText(`C${ci+1}`,sx(c[0]),sy(c[1]));
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// ⑤ 概率计算：正态 / 泊松 / 二项
+// ══════════════════════════════════════════════════════
+function runProbability(msg) {
+  const m=msg.toLowerCase();
+  if(m.includes('泊松')||m.includes('poisson')) return runPoisson(msg);
+  if(m.includes('二项')||m.includes('binomial')) return runBinomial(msg);
+  return runNormal(msg);
+}
+
+// Normal
+function normalPDF(x,mu=0,sig=1){return Math.exp(-0.5*((x-mu)/sig)**2)/(sig*Math.sqrt(2*Math.PI));}
+function normalCDF(z){const t=1/(1+0.2316419*Math.abs(z)),d=0.3989423*Math.exp(-z*z/2),p=d*t*(0.3193815+t*(-0.3565638+t*(1.7814779+t*(-1.8212560+t*1.3302744))));return z>=0?1-p:p;}
+
+function runNormal(msg) {
+  const muM=msg.match(/μ\s*=\s*([\d.\-]+)/i)||msg.match(/均值\s*[=:：]?\s*([\d.\-]+)/);
+  const sigM=msg.match(/σ\s*=\s*([\d.]+)/i)||msg.match(/标准差\s*[=:：]?\s*([\d.]+)/);
+  const mu=muM?parseFloat(muM[1]):0, sig=sigM?parseFloat(sigM[1]):1;
+  const p1=normalCDF(1)-normalCDF(-1), p2=normalCDF(2)-normalCDF(-2);
+  const reply=`已调用统计CLI：\n分布     = 正态分布 N(μ, σ²)\nμ        = ${mu}\nσ        = ${sig}\nP(μ±1σ)  = ${(p1*100).toFixed(2)}%\nP(μ±2σ)  = ${(p2*100).toFixed(2)}%\nP(μ±3σ)  ≈ 99.73%`;
+  return { reply, draw:()=>drawNormal(mu,sig) };
+}
+
+function drawNormal(mu,sig) {
+  setupViz('正态分布 · 概率密度曲线',`μ = <span>${mu}</span> &nbsp; σ = <span>${sig}</span>`);
+  const {ctx,ml,mt,cw,ch}=getCtx();
+  const xMin=mu-4*sig,xMax=mu+4*sig,yMax=normalPDF(mu,mu,sig)*1.28;
+  const sx=mkS([xMin,xMax],ml,cw),sy=mkSY([0,yMax],mt,ch);
+  drawGrid(ctx,[xMin,xMax],[0,yMax],sx,sy,ml,mt,cw,ch,8,4);
+  // ±1σ fill
+  ctx.fillStyle='#f0883e22';ctx.beginPath();ctx.moveTo(sx(mu-sig),sy(0));
+  for(let xi=mu-sig;xi<=mu+sig;xi+=(2*sig)/100)ctx.lineTo(sx(xi),sy(normalPDF(xi,mu,sig)));
+  ctx.lineTo(sx(mu+sig),sy(0));ctx.closePath();ctx.fill();
+  // ±2σ fill
+  [[mu-2*sig,mu-sig],[mu+sig,mu+2*sig]].forEach(([a,b])=>{
+    ctx.fillStyle='#58a6ff11';ctx.beginPath();ctx.moveTo(sx(a),sy(0));
+    for(let xi=a;xi<=b;xi+=(b-a)/60)ctx.lineTo(sx(xi),sy(normalPDF(xi,mu,sig)));
+    ctx.lineTo(sx(b),sy(0));ctx.closePath();ctx.fill();
+  });
+  // Curve
+  ctx.strokeStyle='#f0883e';ctx.lineWidth=2.5;ctx.setLineDash([]);
+  ctx.beginPath();let first=true;
+  for(let xi=xMin;xi<=xMax;xi+=(xMax-xMin)/300){
+    const py=sy(normalPDF(xi,mu,sig));first?ctx.moveTo(sx(xi),py):ctx.lineTo(sx(xi),py);first=false;
+  }
+  ctx.stroke();
+  // σ ticks
+  [-2,-1,1,2].forEach(k=>{
+    ctx.strokeStyle='#30363d';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+    ctx.beginPath();ctx.moveTo(sx(mu+k*sig),mt);ctx.lineTo(sx(mu+k*sig),mt+ch);ctx.stroke();
+  });
+  ctx.setLineDash([]);
+  ctx.fillStyle='#8b949e';ctx.font='10px JetBrains Mono,monospace';ctx.textAlign='center';
+  [-2,-1,0,1,2].forEach(k=>ctx.fillText(k===0?'μ':(k>0?`μ+${k}σ`:`μ${k}σ`),sx(mu+k*sig),mt+ch+16));
+}
+
+// Poisson
+function poissonPMF(k,l){let lp=-l+k*Math.log(l+1e-15);for(let i=1;i<=k;i++)lp-=Math.log(i);return k===0?Math.exp(-l):Math.exp(lp);}
+
+function runPoisson(msg) {
+  const lm=msg.match(/λ\s*=\s*([\d.]+)/i)||msg.match(/(\d+(?:\.\d+)?)/);
+  const lambda=lm?parseFloat(lm[1]):3;
+  const kMax=Math.max(14,Math.ceil(lambda*2.5));
+  const probs=Array.from({length:kMax+1},(_,k)=>poissonPMF(k,lambda));
+  const reply=`已调用统计CLI：\n分布     = 泊松分布 Poisson(λ)\nλ        = ${lambda}\n均值 E[X] = ${lambda.toFixed(2)}\n方差 D[X] = ${lambda.toFixed(2)}\nP(X=0)   = ${probs[0].toFixed(4)}\nP(X=1)   = ${(probs[1]||0).toFixed(4)}\nP(X≤⌊λ⌋) = ${probs.slice(0,Math.floor(lambda)+1).reduce((a,b)=>a+b,0).toFixed(4)}`;
+  return { reply, draw:()=>drawBars(probs,Math.min(kMax,18),lambda,'泊松分布','#58a6ff','泊松分布 · λ='+lambda,`λ = <span>${lambda}</span>`) };
+}
+
+// Binomial
+function binomPMF(k,n,p){let c=1;for(let i=0;i<Math.min(k,n-k);i++)c=c*(n-i)/(i+1);return c*Math.pow(p,k)*Math.pow(1-p,n-k);}
+
+function runBinomial(msg) {
+  const nM=msg.match(/n\s*=\s*(\d+)/i), pM=msg.match(/p\s*=\s*([\d.]+)/i);
+  const n=nM?parseInt(nM[1]):10, p=pM?parseFloat(pM[1]):0.5;
+  const probs=Array.from({length:n+1},(_,k)=>binomPMF(k,n,p));
+  const mu=n*p, v=n*p*(1-p);
+  const reply=`已调用统计CLI：\n分布     = 二项分布 B(n, p)\nn        = ${n}\np        = ${p}\n均值 E[X] = np = ${mu.toFixed(2)}\n方差 D[X] = np(1-p) = ${v.toFixed(2)}\nP(X=0)   = ${probs[0].toFixed(4)}\nP(X=n)   = ${probs[n].toFixed(4)}\nP(X=⌊μ⌋) = ${probs[Math.floor(mu)].toFixed(4)}`;
+  return { reply, draw:()=>drawBars(probs,Math.min(n,20),mu,'二项分布','#3fb950','二项分布 · n='+n+', p='+p,`np = <span>${mu.toFixed(2)}</span> &nbsp; np(1-p) = <span>${v.toFixed(2)}</span>`) };
+}
+
+function drawBars(probs,showN,mu,label,color,title,info) {
+  setupViz(title,info);
+  const {ctx,ml,mt,cw,ch}=getCtx();
+  const yMax=Math.max(...probs.slice(0,showN+1))*1.28;
+  const bw=cw/(showN+2);
+  [0.1,0.2,0.3].filter(v=>v<=yMax).forEach(v=>{
+    const y=mt+ch-(v/yMax)*ch;
+    ctx.strokeStyle='#21262d';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(ml,y);ctx.lineTo(ml+cw,y);ctx.stroke();
+    ctx.fillStyle='#8b949e';ctx.font='10px JetBrains Mono,monospace';ctx.textAlign='right';ctx.fillText(v.toFixed(1),ml-4,y+3);
+  });
+  probs.slice(0,showN+1).forEach((p,k)=>{
+    const bx=ml+(k+0.5)*bw, bh=(p/yMax)*ch, by=mt+ch-bh;
+    ctx.fillStyle=Math.round(mu)===k?'#e3b341':color+'88';ctx.fillRect(bx-bw*0.35,by,bw*0.7,bh);
+    ctx.strokeStyle=color;ctx.lineWidth=1;ctx.strokeRect(bx-bw*0.35,by,bw*0.7,bh);
+    ctx.fillStyle='#8b949e';ctx.font='9px JetBrains Mono,monospace';ctx.textAlign='center';ctx.fillText(k,bx,mt+ch+14);
+  });
+  ctx.strokeStyle='#30363d';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(ml,mt);ctx.lineTo(ml,mt+ch);ctx.lineTo(ml+cw,mt+ch);ctx.stroke();
+}
+
+// ══════════════════════════════════════════════════════
+// Canvas helpers
+// ══════════════════════════════════════════════════════
+function setupViz(title,info){vizTitle.textContent=title;vizInfo.innerHTML=info;vizWrap.style.display='block';}
+
+function getCtx() {
+  const dpr=window.devicePixelRatio||1,W=vizCanvas.parentElement.clientWidth-36,H=240;
+  vizCanvas.style.width=W+'px';vizCanvas.style.height=H+'px';
+  vizCanvas.width=W*dpr;vizCanvas.height=H*dpr;
+  const ctx=vizCanvas.getContext('2d');ctx.scale(dpr,dpr);
+  return {ctx,W,H,ml:44,mr:16,mt:14,mb:36,cw:W-44-16,ch:H-14-36};
+}
+
+function mkS([a,b],off,span){return v=>off+(v-a)/(b-a)*span;}
+function mkSY([a,b],mt,ch){return v=>mt+ch-(v-a)/(b-a)*ch;}
+
+function drawGrid(ctx,xE,yE,sx,sy,ml,mt,cw,ch,nx=5,ny=5) {
+  ctx.clearRect(0,0,vizCanvas.width,vizCanvas.height);
+  ctx.strokeStyle='#21262d';ctx.lineWidth=1;
+  for(let i=0;i<=nx;i++){
+    const x=xE[0]+(xE[1]-xE[0])*i/nx;
+    ctx.beginPath();ctx.moveTo(sx(x),mt);ctx.lineTo(sx(x),mt+ch);ctx.stroke();
+    ctx.fillStyle='#8b949e';ctx.font='10px JetBrains Mono,monospace';ctx.textAlign='center';
+    ctx.fillText(+x.toFixed(1),sx(x),mt+ch+16);
+  }
+  for(let i=0;i<=ny;i++){
+    const y=yE[0]+(yE[1]-yE[0])*i/ny;
+    ctx.beginPath();ctx.moveTo(ml,sy(y));ctx.lineTo(ml+cw,sy(y));ctx.stroke();
+    ctx.fillStyle='#8b949e';ctx.font='10px JetBrains Mono,monospace';ctx.textAlign='right';
+    ctx.fillText(+y.toFixed(1),ml-5,sy(y)+3);
+  }
+  ctx.strokeStyle='#30363d';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(ml,mt);ctx.lineTo(ml,mt+ch);ctx.lineTo(ml+cw,mt+ch);ctx.stroke();
+}
+
+function dot(ctx,x,y,fill,r=5,stroke='#0d1117'){
+  ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fillStyle=fill;ctx.fill();
+  ctx.strokeStyle=stroke;ctx.lineWidth=1.5;ctx.stroke();
+}
+
+function legend(ctx,x,y,color,label,dashed=false){
+  ctx.save();if(dashed)ctx.setLineDash([4,3]);
+  ctx.strokeStyle=color;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+16,y);ctx.stroke();
+  ctx.setLineDash([]);ctx.fillStyle='#8b949e';ctx.font='10px JetBrains Mono,monospace';
+  ctx.textAlign='left';ctx.textBaseline='middle';ctx.fillText(label,x+20,y);ctx.restore();
+}
+
+function mean(arr){return arr.reduce((a,b)=>a+b,0)/arr.length;}
+
+// ── Init ─────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded',()=>{
+  renderChips();
+  addBubble('bot','欢迎使用 <strong>CLI-Anything 统计多工具台</strong>。<br>请选择上方工具标签，或直接描述需求（系统自动识别工具）。<br><em style="color:var(--muted)">支持：线性回归 · 逻辑分类 · 线性判别 · K-均值聚类 · 概率计算</em>');
+});
 </script>
 </body>
 </html>

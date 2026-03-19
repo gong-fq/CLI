@@ -88,20 +88,21 @@ const TOOLS = [
     type: "function",
     function: {
       name: "run_custom_plot",
-      description: "当用户要求绘制工具集中没有的统计分布或图形时调用此工具，例如：卡方分布、t分布、F分布、对数正态分布、Beta分布、Gamma分布、指数分布、均匀分布等。生成纯JavaScript绘图代码在Canvas上执行。",
+      description: "当用户要求绘制工具集中没有的统计分布或图形时调用此工具，例如：卡方分布、t分布、F分布、对数正态分布、Beta分布、Gamma分布、指数分布、均匀分布等。支持单曲线(pdf_js)和多曲线(curves数组)模式。y_max可省略，前端会自动计算。",
       parameters: {
         type: "object",
         properties: {
-          title:       { type: "string", description: "图表标题，如'卡方分布 χ²(k=5)'" },
-          info:        { type: "string", description: "图表下方参数信息，如'自由度 k = 5'" },
-          plot_type:   { type: "string", enum: ["curve", "bars"], description: "curve=连续分布曲线, bars=离散分布条形图" },
-          x_min:       { type: "number", description: "x轴最小值" },
-          x_max:       { type: "number", description: "x轴最大值" },
-          y_max:       { type: "number", description: "y轴最大值（概率密度上限）" },
-          pdf_js:      { type: "string", description: "JavaScript函数体字符串，参数为x，返回该点的PDF/PMF值。只写函数体，不含function声明。例如：'const k=5; return Math.pow(x,k/2-1)*Math.exp(-x/2)/(Math.pow(2,k/2)*gamma(k/2));'" },
-          description: { type: "string", description: "分布的简要统计说明，包含均值、方差等，2-3句话" }
+          title:       { type: "string", description: "图表标题，如'卡方分布 χ²'" },
+          info:        { type: "string", description: "图表下方参数信息" },
+          plot_type:   { type: "string", enum: ["curve", "bars"], description: "curve=连续分布, bars=离散分布" },
+          x_min:       { type: "number", description: "x轴起始值（连续分布建议从0.001而非0开始，避免奇点）" },
+          x_max:       { type: "number", description: "x轴结束值" },
+          y_max:       { type: "number", description: "y轴上限，可省略由前端自动计算（推荐省略）" },
+          pdf_js:      { type: "string", description: "单曲线模式：JS函数体，参数x，返回PDF值。可用gamma(n)/lnGamma(n)/betaFn(a,b)。只写函数体不含声明。" },
+          curves:      { type: "array",  description: "多曲线模式：数组，每项{label:string, pdf_js:string, color?:string}。用于在同一图中展示多个参数的分布。与pdf_js二选一，优先用curves。", items: { type: "object" } },
+          description: { type: "string", description: "分布的简要统计说明，2-3句话" }
         },
-        required: ["title", "plot_type", "x_min", "x_max", "y_max", "pdf_js", "description"]
+        required: ["title", "plot_type", "x_min", "x_max"]
       }
     }
   }
@@ -161,21 +162,41 @@ exports.handler = async (event) => {
 - 泊松分布 → run_poisson（提取λ）
 - 二项分布 → run_binomial（提取n、p）
 
-【动态绘图工具】用户要求绘制以下分布时，调用 run_custom_plot，自己编写正确的PDF/PMF的JavaScript代码：
-- 卡方分布χ²(k)：PDF = x^(k/2-1)*exp(-x/2) / (2^(k/2)*Γ(k/2))，x>0
-- t分布t(ν)：PDF ∝ (1+x²/ν)^(-(ν+1)/2)
-- F分布F(d1,d2)：PDF涉及Beta函数
-- 对数正态分布：PDF = exp(-(ln(x)-μ)²/(2σ²)) / (x*σ*sqrt(2π))，x>0
-- Beta分布Beta(α,β)：PDF = x^(α-1)*(1-x)^(β-1)/B(α,β)，0<x<1
-- Gamma分布Gamma(α,β)：PDF = x^(α-1)*exp(-x/β) / (β^α*Γ(α))，x>0
-- 指数分布Exp(λ)：PDF = λ*exp(-λx)，x>0
-- 均匀分布U(a,b)：PDF = 1/(b-a)，a<x<b
-- 以及用户要求的任何其他统计分布
+【动态绘图工具】用户要求绘制工具集之外的分布时，调用 run_custom_plot。
+必须使用 curves 数组（每个参数一条曲线），不要使用单一 pdf_js。
+x_min/x_max/y_max 可根据分布特点设置，y_max 可省略由前端自动计算。
 
-pdf_js字段中可以使用以下辅助函数（已在前端实现）：
-- gamma(n)：Gamma函数（支持半整数）
-- lnGamma(n)：ln(Gamma(n))
-- betaFn(a,b)：Beta函数
+以下是各分布的标准 pdf_js 写法（直接复制使用，k/nu/d1/d2/mu/sigma/alpha/beta/lambda 替换为具体数值）：
+
+卡方分布 χ²(k)，x>0，x_min=0.001：
+  "if(x<=0) return 0; var k=5; return Math.exp((k/2-1)*Math.log(x) - x/2 - (k/2)*Math.log(2) - lnGamma(k/2));"
+
+t分布 t(ν)，x∈(-∞,+∞)：
+  "var nu=5; return Math.exp(lnGamma((nu+1)/2) - lnGamma(nu/2)) / (Math.sqrt(nu*Math.PI)) * Math.pow(1+x*x/nu, -(nu+1)/2);"
+
+F分布 F(d1,d2)，x>0，x_min=0.001：
+  "if(x<=0) return 0; var d1=5,d2=10; var lp=lnGamma((d1+d2)/2)-lnGamma(d1/2)-lnGamma(d2/2)+(d1/2)*Math.log(d1/d2)+(d1/2-1)*Math.log(x)-((d1+d2)/2)*Math.log(1+d1*x/d2); return Math.exp(lp);"
+
+对数正态 LN(μ,σ)，x>0，x_min=0.001：
+  "if(x<=0) return 0; var mu=0,sigma=0.5; return Math.exp(-Math.pow(Math.log(x)-mu,2)/(2*sigma*sigma)) / (x*sigma*Math.sqrt(2*Math.PI));"
+
+Beta分布 Beta(α,β)，0<x<1，x_min=0.001，x_max=0.999：
+  "if(x<=0||x>=1) return 0; var a=2,b=5; return Math.exp((a-1)*Math.log(x)+(b-1)*Math.log(1-x)-lnGamma(a)-lnGamma(b)+lnGamma(a+b));"
+
+Gamma分布 Gamma(α,β)，x>0，x_min=0.001：
+  "if(x<=0) return 0; var a=2,b=2; return Math.exp((a-1)*Math.log(x) - x/b - a*Math.log(b) - lnGamma(a));"
+
+指数分布 Exp(λ)，x>0：
+  "if(x<0) return 0; var lam=1; return lam*Math.exp(-lam*x);"
+
+均匀分布 U(a,b)：
+  "var a=0,b=1; return (x>=a&&x<=b)?1/(b-a):0;"
+
+【重要规则】
+1. 多参数对比时，必须用 curves 数组，每条曲线对应一个参数值，有独立的 label 和 pdf_js
+2. pdf_js 只写函数体（不含 function 声明），参数名必须是 x，可调用 gamma/lnGamma/betaFn
+3. 所有对 x 的限制（x>0 等）必须在 pdf_js 内部用 if 判断，不能依赖 x_min
+4. 使用 lnGamma 而非直接用 gamma 做乘除，避免数值溢出
 
 【其他】仅当消息完全与统计/数学无关时，才返回文字说明。`;
 

@@ -597,24 +597,34 @@ function runCustomPlot(args) {
     return { reply: '已调用统计CLI：\n缺少绘图代码' };
   }
 
+  // safePdf: 对奇点钳制，单点上限设为 1e6，防止 Infinity 污染采样
   const safePdf = function(fn, x) {
-    try { var v = fn(x, gamma, lnGamma, betaFn); return (isFinite(v) && v >= 0) ? v : 0; } catch(e) { return 0; }
+    try {
+      var v = fn(x, gamma, lnGamma, betaFn);
+      if (!isFinite(v) || v < 0 || isNaN(v)) return 0;
+      return Math.min(v, 1e6);
+    } catch(e) { return 0; }
   };
 
-  // 自动计算 y_max：取各曲线采样值的 95th 百分位 × 1.35（跳过 x_min 附近的奇点）
-  var STEPS = 400;
-  var xStart = x_min + (x_max - x_min) * 0.005;
+  // 自动计算 y_max：
+  // 1. 跳过最左侧 5% 区间（卡方 k=1 等在 x→0 处为 ∞）
+  // 2. 取剩余采样的 90th 百分位 × 1.4
+  // 3. 若 y_max_hint 有效则直接使用
+  var STEPS = 500;
+  var xSkip = x_min + (x_max - x_min) * 0.05;   // 跳过左侧 5%
+  var xStart = xSkip;
   var dx = (x_max - xStart) / STEPS;
   var samples = [];
   curveList.forEach(function(c) {
     for (var i = 1; i <= STEPS; i++) {
       var v = safePdf(c.fn, xStart + i * dx);
-      if (v > 0) samples.push(v);
+      if (v > 0 && v < 1e6) samples.push(v);
     }
   });
   samples.sort(function(a,b){return a-b;});
-  var p95 = samples[Math.floor(samples.length * 0.95)] || 0.5;
-  var y_max = (y_max_hint && y_max_hint > 0) ? y_max_hint : p95 * 1.35;
+  var p90 = samples.length > 0 ? samples[Math.floor(samples.length * 0.90)] : 0.5;
+  var autoYmax = p90 * 1.4;
+  var y_max = (y_max_hint && y_max_hint > 0) ? y_max_hint : (autoYmax > 0 ? autoYmax : 0.5);
 
   var descText = description || '';
   var reply = '已调用统计CLI：\n' + title + (descText ? '\n' + descText : '');
@@ -649,13 +659,18 @@ function runCustomPlot(args) {
         }
       });
     } else {
+      // 绘图从 x_min 极小偏移处开始，y 值钳制在 y_max 内，避免奇点溢出
+      var xDraw = x_min + (x_max - x_min) * 0.001;
+      var dxDraw = (x_max - xDraw) / STEPS;
+      var clamp = function(v) { return Math.min(Math.max(v, 0), y_max); };
+
       if (curveList.length === 1) {
         var c0 = curveList[0];
         ctx.fillStyle = c0.color + '15';
-        ctx.beginPath(); ctx.moveTo(sx(xStart), sy(0));
+        ctx.beginPath(); ctx.moveTo(sx(xDraw), sy(0));
         for (var i = 0; i <= STEPS; i++) {
-          var xi = xStart + i * dx;
-          ctx.lineTo(sx(xi), sy(safePdf(c0.fn, xi)));
+          var xi = xDraw + i * dxDraw;
+          ctx.lineTo(sx(xi), sy(clamp(safePdf(c0.fn, xi))));
         }
         ctx.lineTo(sx(x_max), sy(0)); ctx.closePath(); ctx.fill();
       }
@@ -664,9 +679,8 @@ function runCustomPlot(args) {
         ctx.beginPath();
         var first = true;
         for (var i = 0; i <= STEPS; i++) {
-          var xi = xStart + i * dx;
-          var yv = safePdf(c.fn, xi);
-          var py = sy(Math.min(yv, y_max * 1.02));
+          var xi = xDraw + i * dxDraw;
+          var py = sy(clamp(safePdf(c.fn, xi)));
           if (first) { ctx.moveTo(sx(xi), py); first = false; }
           else { ctx.lineTo(sx(xi), py); }
         }

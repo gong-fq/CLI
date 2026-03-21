@@ -740,6 +740,13 @@ window.addEventListener('DOMContentLoaded',()=>{
     '现在由 <strong>DeepSeek</strong> 理解您的自然语言，自动识别工具和参数。<br>' +
     '<em style="color:var(--muted)">试试：帮我做线性回归 / K=4聚类 / 泊松分布λ=5</em>'
   );
+  // 页面就绪后通知 opener（opencli-gong），可以发送数据了
+  if (window.opener) {
+    window.opener.postMessage(
+      { type: 'CLI_READY' },
+      'https://opencli-gong.netlify.app'
+    );
+  }
 });
 </script>
 </body>

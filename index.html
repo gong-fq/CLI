@@ -127,15 +127,20 @@ window.addEventListener('message', (event) => {
   // 发送确认回执，让发送方停止轮询
   event.source.postMessage({ type: 'STATS_PIPELINE_ACK' }, event.origin);
 
-  // 将数据填入对话框并自动触发分析
+  // 将数据填入对话框并自动发送
   const yValues = nodes.map(n => n.value).join(', ');
   const periods  = nodes.map(n => n.period).join(', ');
   const prompt   = `来自 OpenCLI 数据采集台的统计数据（指标：${cmd}）\n期间：${periods}\n数值：${yValues}\n\n请帮我做线性回归分析。`;
 
-  const input = document.getElementById('chatInput');
+  const input = document.getElementById('user-input');
   if (input) {
     input.value = prompt;
-    input.dispatchEvent(new Event('input'));   // 触发响应式更新
+    input.dispatchEvent(new Event('input'));
+    // 稍等页面稳定后自动点击发送
+    setTimeout(() => {
+      const btn = document.getElementById('send-btn');
+      if (btn && !btn.disabled) btn.click();
+    }, 300);
   }
 
   // 可选：显示管道提示横幅

@@ -709,8 +709,10 @@ window.addEventListener('DOMContentLoaded',()=>{
   const raw = params.get('pipeline');
   if (raw) {
     try {
-      const { cmd, nodes } = JSON.parse(decodeURIComponent(raw));
-      if (nodes && nodes.length > 0) {
+      const { cmd, p, v } = JSON.parse(decodeURIComponent(raw));
+      if (p && v && p.length > 0) {
+        // 还原完整 nodes 数组
+        const nodes = p.map((period, i) => ({ period, value: v[i] }));
         const yValues = nodes.map(n => n.value).join(', ');
         const periods  = nodes.map(n => n.period).join(', ');
         const prompt   =
@@ -729,12 +731,11 @@ window.addEventListener('DOMContentLoaded',()=>{
           }, 400);
         }
 
-        // 顶部绿色横幅提示
+        // 顶部绿色横幅
         const banner = document.createElement('div');
         banner.style.cssText =
           'position:fixed;top:0;left:0;right:0;background:#238636;' +
-          'color:#fff;text-align:center;padding:9px 16px;font-size:13px;' +
-          'z-index:9999;letter-spacing:.03em;';
+          'color:#fff;text-align:center;padding:9px 16px;font-size:13px;z-index:9999;';
         banner.textContent =
           `✅ 已接收来自 OpenCLI 的数据：${cmd}，共 ${nodes.length} 条，正在自动分析…`;
         document.body.prepend(banner);

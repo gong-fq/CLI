@@ -76,9 +76,38 @@
     #send-btn:disabled{opacity:.4;cursor:not-allowed;}
 
     footer{width:100%;max-width:860px;padding:8px 24px 20px;font-size:11px;color:var(--muted);font-family:var(--font-mono);}
+
+    /* ── 访问码弹窗 ── */
+    #auth-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);display:flex;align-items:center;justify-content:center;z-index:9999;}
+    #auth-overlay.hidden{display:none;}
+    #auth-box{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);padding:32px 28px;width:min(360px,90vw);display:flex;flex-direction:column;gap:14px;}
+    #auth-box h2{font-family:var(--font-mono);font-size:13px;letter-spacing:.1em;color:var(--accent);text-transform:uppercase;}
+    #auth-box p{font-size:12px;color:var(--muted);font-family:var(--font-mono);line-height:1.6;}
+    #auth-input{background:var(--bg);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font-mono);font-size:14px;padding:9px 12px;outline:none;transition:border-color .16s;width:100%;}
+    #auth-input:focus{border-color:var(--accent2);}
+    #auth-btn{background:var(--accent);border:none;border-radius:8px;color:#000;font-family:var(--font-mono);font-size:13px;font-weight:600;padding:9px;cursor:pointer;transition:opacity .16s;}
+    #auth-btn:hover{opacity:.88;}
+    #auth-error{font-family:var(--font-mono);font-size:11px;color:#f85149;min-height:14px;}
+    #auth-demo-btn{background:transparent;border:1px solid var(--border);border-radius:8px;color:var(--muted);font-family:var(--font-mono);font-size:11px;padding:7px;cursor:pointer;transition:all .16s;}
+    #auth-demo-btn:hover{border-color:var(--muted);color:var(--text);}
+    /* 演示模式横幅 */
+    #demo-banner{display:none;background:#1a2233;border:1px solid var(--border);border-radius:var(--radius);padding:8px 14px;margin-top:14px;font-family:var(--font-mono);font-size:11px;color:var(--muted);text-align:center;}
   </style>
 </head>
 <body>
+
+<!-- ── 访问码弹窗 ── -->
+<div id="auth-overlay">
+  <div id="auth-box">
+    <h2>🔐 CLI-Anything · 访问验证</h2>
+    <p>本工具台接入了 DeepSeek API。<br>请输入访问码以启用 AI 功能，或以演示模式浏览。</p>
+    <input id="auth-input" type="password" placeholder="请输入访问码…" autocomplete="off" />
+    <div id="auth-error"></div>
+    <button id="auth-btn" onclick="submitAuth()">进入工具台</button>
+    <button id="auth-demo-btn" onclick="enterDemo()">以演示模式访问（不启用 AI）</button>
+  </div>
+</div>
+<div id="demo-banner">⚠️ 演示模式：AI 功能未启用，仅展示界面。如需启用，请刷新页面并输入访问码。</div>
 
 <header>
   <p class="header-tag">CLI-Anything · LLM 驱动 · 路线 B</p>
@@ -135,6 +164,35 @@ const TAB_CHIPS = {
   kmeans:       ['K均值聚类 K=3','K=2聚类','K=4聚类'],
   probability:  ['正态分布 μ=0 σ=1','泊松分布 λ=3','二项分布 n=10 p=0.5'],
 };
+
+// ── 访问控制 ──────────────────────────────────────────
+let isDemoMode = false;
+
+function submitAuth() {
+  const val = document.getElementById('auth-input').value.trim();
+  if (!val) { document.getElementById('auth-error').textContent = '请输入访问码'; return; }
+  sessionStorage.setItem('cli_token', val);
+  document.getElementById('auth-overlay').classList.add('hidden');
+}
+
+function enterDemo() {
+  isDemoMode = true;
+  document.getElementById('auth-overlay').classList.add('hidden');
+  document.getElementById('demo-banner').style.display = 'block';
+  document.getElementById('send-btn').disabled = true;
+  document.getElementById('user-input').placeholder = '演示模式下 AI 功能已禁用';
+}
+
+document.getElementById('auth-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') submitAuth();
+});
+
+// ── 检查是否已有 token（刷新免重输）
+window.addEventListener('DOMContentLoaded', () => {
+  if (sessionStorage.getItem('cli_token')) {
+    document.getElementById('auth-overlay').classList.add('hidden');
+  }
+});
 
 // ── State ─────────────────────────────────────────────
 let currentTab = 'regression';
@@ -233,10 +291,21 @@ async function sendMessage() {
   try {
     const res = await fetch('/.netlify/functions/llm', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-access-token': sessionStorage.getItem('cli_token') || ''
+      },
       body: JSON.stringify({ message: msg, history: history.slice(0, -1) })
     });
     const data = await res.json();
+
+    if (data.error === 'ACCESS_DENIED') {
+      sessionStorage.removeItem('cli_token');
+      thinkBubble.querySelector('div:last-child').innerHTML =
+        '<span style="color:#f85149">访问码错误或已失效，请刷新页面重新输入。</span>';
+      sendBtn.disabled = false;
+      return;
+    }
 
     if (data.error) {
       thinkBubble.querySelector('div:last-child').innerHTML =

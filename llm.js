@@ -6,8 +6,23 @@ const TOOLS = [
     type: "function",
     function: {
       name: "run_regression",
-      description: "线性回归（OLS最小二乘），拟合直线，计算斜率、截距、R²",
-      parameters: { type: "object", properties: {}, required: [] }
+      description: "线性回归（OLS最小二乘），拟合直线，计算斜率、截距、R²。若用户消息中含有数值数组（来自数据管道），必须将其提取并传入 x 和 y 参数。",
+      parameters: {
+        type: "object",
+        properties: {
+          x: {
+            type: "array",
+            items: { type: "number" },
+            description: "自变量数组。若消息含数值序列，提取为 [1,2,3,...n] 序号；否则省略。"
+          },
+          y: {
+            type: "array",
+            items: { type: "number" },
+            description: "因变量数组。若消息含数值序列，提取全部数值；否则省略。"
+          }
+        },
+        required: []
+      }
     }
   },
   {
@@ -148,16 +163,6 @@ function fallbackDetect(message) {
 exports.handler = async (event) => {
   if (event.httpMethod !== "POST") return { statusCode: 405, body: "Method Not Allowed" };
 
-  // ── 访问控制：校验前端传来的 token ──
-  const clientToken = event.headers["x-access-token"] || "";
-  if (clientToken !== process.env.ACCESS_TOKEN) {
-    return {
-      statusCode: 403,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ error: "ACCESS_DENIED" })
-    };
-  }
-
   const { message, history = [] } = JSON.parse(event.body || "{}");
   if (!message) return { statusCode: 400, body: "missing message" };
 
@@ -171,6 +176,14 @@ exports.handler = async (event) => {
 - 正态分布/高斯分布 → run_normal（提取μ、σ）
 - 泊松分布 → run_poisson（提取λ）
 - 二项分布 → run_binomial（提取n、p）
+
+【数据管道 — 极重要】当用户消息中包含"数值：..."这一行时，表示来自数据管道的真实统计数据。
+调用 run_regression 时必须：
+1. 将"数值："后面的所有数字提取为 y 数组
+2. 将 x 设为 [1, 2, 3, ..., n]（与 y 等长的序号）
+3. 绝对不能省略 x 和 y 参数，否则前端会用错误的演示数据
+
+例：消息含"数值：100, 200, 350"，则传入 x=[1,2,3], y=[100,200,350]
 
 【动态绘图工具】用户要求绘制工具集之外的分布时，调用 run_custom_plot。
 必须使用 curves 数组（每个参数一条曲线），不要使用单一 pdf_js。

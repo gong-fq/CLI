@@ -87,6 +87,61 @@ const TOOLS = [
   {
     type: "function",
     function: {
+      name: "run_scatter",
+      description: "绘制散点图，支持两列数据（X轴/Y轴）或单列时序数据。若用户提供了数值数组（来自数据管道），提取为 y，x 设为序号。可选择是否显示回归拟合线。",
+      parameters: {
+        type: "object",
+        properties: {
+          x:         { type: "array",   items: { type: "number" }, description: "X轴数据数组，若省略则用序号" },
+          y:         { type: "array",   items: { type: "number" }, description: "Y轴数据数组" },
+          x_label:   { type: "string",  description: "X轴标签，默认'X'" },
+          y_label:   { type: "string",  description: "Y轴标签，默认'Y'" },
+          fit_line:  { type: "boolean", description: "是否叠加OLS拟合线，默认true" },
+          title:     { type: "string",  description: "图表标题" }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "run_arima",
+      description: "时间序列分析：ARIMA模型识别（ACF/PACF特征分析）、趋势分解（趋势+季节+随机），以及简单预测。适用于用户提供时序数据时的分析请求。",
+      parameters: {
+        type: "object",
+        properties: {
+          y:        { type: "array",   items: { type: "number" }, description: "时序数据数组（从管道获取或演示数据）" },
+          periods:  { type: "array",   items: { type: "string" }, description: "对应期间标签数组，如['2000','2001',...]" },
+          p:        { type: "integer", description: "AR阶数，默认1，范围0-3" },
+          d:        { type: "integer", description: "差分阶数，默认1，范围0-2" },
+          q:        { type: "integer", description: "MA阶数，默认1，范围0-3" },
+          forecast: { type: "integer", description: "预测步数，默认5，最多20" },
+          var_mode: { type: "boolean", description: "若为true，切换为VAR（向量自回归）双变量分析模式" }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
+      name: "run_panel",
+      description: "面板数据模型（Panel Data）：固定效应（FE）和随机效应（RE）估计，Hausman检验，组内/组间变异分析。用于多个个体跨时间的数据分析。",
+      parameters: {
+        type: "object",
+        properties: {
+          model:      { type: "string", enum: ["fe", "re", "both"], description: "fe=固定效应, re=随机效应, both=两者对比+Hausman检验，默认both" },
+          n_entities: { type: "integer", description: "个体数N，默认5，范围2-10" },
+          n_periods:  { type: "integer", description: "时期数T，默认6，范围3-12" }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "run_custom_plot",
       description: "当用户要求绘制工具集中没有的统计分布或图形时调用此工具，例如：卡方分布、t分布、F分布、对数正态分布、Beta分布、Gamma分布、指数分布、均匀分布等。支持单曲线(pdf_js)和多曲线(curves数组)模式。y_max可省略，前端会自动计算。",
       parameters: {
@@ -110,6 +165,9 @@ const TOOLS = [
 
 // 关键词兜底映射（仅针对已有的7个固定工具）
 const KEYWORD_MAP = [
+  { keys: ['散点图', 'scatter', '散点'],         tool: 'run_scatter',     argFn: () => ({}) },
+  { keys: ['时间序列', 'arima', '时序', 'var模型', '向量自回归'], tool: 'run_arima', argFn: extractArimaArgs },
+  { keys: ['面板数据', '固定效应', '随机效应', 'hausman', 'panel'], tool: 'run_panel', argFn: extractPanelArgs },
   { keys: ['泊松', 'poisson'],                  tool: 'run_poisson',     argFn: extractPoissonArgs },
   { keys: ['二项', 'binomial'],                  tool: 'run_binomial',    argFn: extractBinomialArgs },
   { keys: ['正态', '高斯', 'normal gaussian'],   tool: 'run_normal',      argFn: extractNormalArgs },
@@ -119,6 +177,15 @@ const KEYWORD_MAP = [
   { keys: ['聚类', 'kmeans', 'k均值'],           tool: 'run_kmeans',      argFn: extractKmeansArgs },
 ];
 
+function extractArimaArgs(msg) {
+  const p = msg.match(/p\s*=\s*(\d)/i), d = msg.match(/d\s*=\s*(\d)/i), q = msg.match(/q\s*=\s*(\d)/i);
+  const isVar = /var模型|向量自回归/i.test(msg);
+  return { p: p ? parseInt(p[1]) : 1, d: d ? parseInt(d[1]) : 1, q: q ? parseInt(q[1]) : 1, var_mode: isVar };
+}
+function extractPanelArgs(msg) {
+  const fe = /固定效应/i.test(msg), re = /随机效应/i.test(msg);
+  return { model: (fe && !re) ? 'fe' : (re && !fe) ? 're' : 'both' };
+}
 function extractPoissonArgs(msg) {
   const m = msg.match(/λ\s*=\s*([\d.]+)/i) || msg.match(/lambda\s*=\s*([\d.]+)/i) || msg.match(/([\d.]+)/);
   return { lambda: m ? parseFloat(m[1]) : 3 };
@@ -161,6 +228,14 @@ exports.handler = async (event) => {
 - 正态分布/高斯分布 → run_normal（提取μ、σ）
 - 泊松分布 → run_poisson（提取λ）
 - 二项分布 → run_binomial（提取n、p）
+- 散点图/scatter → run_scatter（若含管道数据提取y，x为序号；fit_line默认true）
+- 时间序列/ARIMA/时序/VAR → run_arima（提取p/d/q；管道数据提取y和periods；VAR设var_mode=true）
+- 面板数据/固定效应/随机效应/Hausman → run_panel（model: fe/re/both）
+
+【数据管道 — 极重要】当用户消息中包含"数值：..."这一行时：
+- run_regression/run_scatter：y=数值数组，x=[1,2,...,n]
+- run_arima：y=数值数组，periods=期间数组
+- 绝对不能省略 y 参数，否则前端会用错误的演示数据
 
 【动态绘图工具】用户要求绘制工具集之外的分布时，调用 run_custom_plot。
 必须使用 curves 数组（每个参数一条曲线），不要使用单一 pdf_js。

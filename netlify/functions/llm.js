@@ -142,6 +142,22 @@ const TOOLS = [
   {
     type: "function",
     function: {
+      name: "fetch_bea_data",
+      description: "从美国经济分析局（BEA）获取宏观经济数据。用户提到BEA、美国GDP、PCE、GNP、NIPA国民账户时调用。",
+      parameters: {
+        type: "object",
+        properties: {
+          table_name: { type: "string", description: "BEA表名，如T10101(GDP)、T20804(PCE)、T10105(GNP)，默认T10101" },
+          frequency:  { type: "string", enum: ["A","Q","M"], description: "A=年度,Q=季度,M=月度，默认Q" },
+          year:       { type: "string", description: "起始年份如2000，默认X（全部）" }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "run_custom_plot",
       description: "当用户要求绘制工具集中没有的统计分布或图形时调用此工具，例如：卡方分布、t分布、F分布、对数正态分布、Beta分布、Gamma分布、指数分布、均匀分布等。支持单曲线(pdf_js)和多曲线(curves数组)模式。y_max可省略，前端会自动计算。",
       parameters: {
@@ -165,6 +181,7 @@ const TOOLS = [
 
 // 关键词兜底映射（仅针对已有的7个固定工具）
 const KEYWORD_MAP = [
+  { keys: ['bea','美国gdp','nipa','国民账户','美国经济分析','pce数据','美国pce'], tool: 'fetch_bea_data', argFn: extractBeaArgs },
   { keys: ['散点图', 'scatter', '散点'],         tool: 'run_scatter',     argFn: () => ({}) },
   { keys: ['时间序列', 'arima', '时序', 'var模型', '向量自回归'], tool: 'run_arima', argFn: extractArimaArgs },
   { keys: ['面板数据', '固定效应', '随机效应', 'hausman', 'panel'], tool: 'run_panel', argFn: extractPanelArgs },
@@ -176,6 +193,13 @@ const KEYWORD_MAP = [
   { keys: ['判别', 'lda', 'fisher'],             tool: 'run_discriminant', argFn: () => ({}) },
   { keys: ['聚类', 'kmeans', 'k均值'],           tool: 'run_kmeans',      argFn: extractKmeansArgs },
 ];
+
+function extractBeaArgs(msg) {
+  const m = msg.toLowerCase();
+  const table_name = m.includes('pce') ? 'T20804' : m.includes('gnp') ? 'T10105' : 'T10101';
+  const frequency  = /月度|monthly/i.test(msg) ? 'M' : /年度|annual/i.test(msg) ? 'A' : 'Q';
+  return { table_name, frequency, year: 'X' };
+}
 
 function extractArimaArgs(msg) {
   const p = msg.match(/p\s*=\s*(\d)/i), d = msg.match(/d\s*=\s*(\d)/i), q = msg.match(/q\s*=\s*(\d)/i);
@@ -231,6 +255,7 @@ exports.handler = async (event) => {
 - 散点图/scatter → run_scatter（若含管道数据提取y，x为序号；fit_line默认true）
 - 时间序列/ARIMA/时序/VAR → run_arima（提取p/d/q；管道数据提取y和periods；VAR设var_mode=true）
 - 面板数据/固定效应/随机效应/Hausman → run_panel（model: fe/re/both）
+- BEA数据/美国GDP/NIPA/PCE → fetch_bea_data（提取table_name/frequency）
 
 【数据管道 — 极重要】当用户消息中包含"数值：..."这一行时：
 - run_regression/run_scatter：y=数值数组，x=[1,2,...,n]

@@ -167,6 +167,7 @@ const TOOL_META = {
   run_scatter:      { tab:'scatter',      label:'散点图',     chips:['帮我画散点图','绘制散点图并拟合直线','散点图不要拟合线'] },
   run_arima:        { tab:'timeseries',   label:'时间序列',   chips:['ARIMA时间序列分析','VAR向量自回归','时序趋势预测'] },
   run_panel:        { tab:'panel',        label:'面板数据',   chips:['面板数据固定效应','随机效应估计','Hausman检验'] },
+  fetch_bea_data:   { tab:'timeseries',   label:'BEA数据',    chips:['查询美国GDP季度数据','获取PCE月度数据','BEA年度国民账户'] },
 };
 
 const TAB_CHIPS = {
@@ -176,7 +177,7 @@ const TAB_CHIPS = {
   kmeans:       ['K均值聚类 K=3','K=2聚类','K=4聚类'],
   probability:  ['正态分布 μ=0 σ=1','泊松分布 λ=3','二项分布 n=10 p=0.5'],
   scatter:      ['帮我画散点图','绘制散点图并拟合直线','散点图不要拟合线'],
-  timeseries:   ['ARIMA时间序列分析','VAR向量自回归','时序趋势预测'],
+  timeseries:   ['ARIMA时间序列分析','VAR向量自回归','时序趋势预测','查询美国GDP季度数据'],
   panel:        ['面板数据固定效应','随机效应估计','固定效应vs随机效应Hausman检验'],
 };
 
@@ -348,7 +349,7 @@ async function sendMessage() {
         }
       }
 
-      const result = runTool(tool, args);
+      const result = await runTool(tool, args);
       thinkBubble.querySelector('div:last-child').innerHTML = formatResult(result.reply);
       thinkBubble.querySelector('.bubble-label').insertAdjacentHTML('afterend',
         '<div class="llm-tag">⚡ DeepSeek → ' + (meta?.label || tool) + '</div>');
@@ -375,7 +376,7 @@ async function sendMessage() {
 // ══════════════════════════════════════════════════════
 // 工具执行层（纯前端计算）
 // ══════════════════════════════════════════════════════
-function runTool(name, args) {
+async function runTool(name, args) {
   switch (name) {
     case 'run_regression':   return runRegression(args);
     case 'run_logistic':     return runLogistic();
@@ -388,6 +389,7 @@ function runTool(name, args) {
     case 'run_scatter':      return runScatter(args);
     case 'run_arima':        return runArima(args);
     case 'run_panel':        return runPanel(args);
+    case 'fetch_bea_data':   return await runBeaFetch(args);
     default: return { reply: `未知工具：${name}` };
   }
 }
@@ -1093,6 +1095,90 @@ function runPanel(args) {
 }
 
 function mean(arr){return arr.reduce((a,b)=>a+b,0)/arr.length;}
+
+// ══════════════════════════════════════════════════════
+// ⑩ BEA 数据获取（调用 bea-proxy Netlify Function）
+// ══════════════════════════════════════════════════════
+async function runBeaFetch(args) {
+  const { table_name = 'T10101', frequency = 'Q', year = 'X' } = args;
+  const tableLabels = { T10101: 'GDP', T20804: 'PCE', T10105: 'GNP' };
+  const label = tableLabels[table_name] || table_name;
+
+  try {
+    const resp = await fetch(
+      `/.netlify/functions/bea-proxy?table=${table_name}&freq=${frequency}&year=${year}`
+    );
+    const json = await resp.json();
+
+    if (json.beaError) {
+      return { reply: `已调用统计CLI：\nBEA 数据获取失败：${json.beaError}` };
+    }
+
+    // 解析原始数据行
+    let rows = [];
+    try {
+      const raw = typeof json.rawSlice === 'string' ? JSON.parse(json.rawSlice) : json.rawSlice;
+      rows = raw?.BEA?.Results?.Data || [];
+    } catch(_) {}
+
+    if (!rows.length) {
+      return { reply: `已调用统计CLI：\nBEA 返回数据为空（表：${table_name}，频率：${frequency}）` };
+    }
+
+    // Line 1 = 总量指标（如GDP总量、PCE总量）
+    const series  = rows.filter(r => r.LineNumber === '1');
+    const y       = series.map(r => parseFloat((r.DataValue || '0').replace(/,/g, ''))).filter(v => !isNaN(v));
+    const periods = series.map(r => r.TimePeriod);
+    const unit    = series[0]?.CL_UNIT   || '';
+    const metric  = series[0]?.METRIC_NAME || '';
+
+    // 写入全局管道，后续 ARIMA / 散点图可直接使用
+    window._pipelineData = {
+      x: y.map((_,i) => i + 1),
+      y,
+      labels: periods,
+      cmd: label
+    };
+
+    const reply =
+      `已调用统计CLI：\nBEA 数据获取成功 ─ ${label}\n` +
+      `表名：${table_name}　频率：${frequency}　记录数：${y.length}\n` +
+      `指标：${metric}　单位：${unit}\n` +
+      `最早：${y[0]?.toLocaleString()}（${periods[0]}）\n` +
+      `最新：${y[y.length-1]?.toLocaleString()}（${periods[periods.length-1]}）\n\n` +
+      `数据已载入管道，可继续说"帮我做时间序列分析"或"画散点图"。`;
+
+    return {
+      reply,
+      draw: () => {
+        setupViz(
+          `BEA · ${label} (${frequency})`,
+          `记录：<span>${y.length}</span> 条 &nbsp; 最新：<span>${y[y.length-1]?.toLocaleString()}</span>（${periods[periods.length-1]}）`
+        );
+        const { ctx, ml, mt, cw, ch } = getCtx();
+        const yPad = (Math.max(...y) - Math.min(...y)) * 0.1 || 1;
+        const yMin = Math.min(...y) - yPad, yMax = Math.max(...y) + yPad;
+        const sx = mkS([0, y.length - 1], ml, cw);
+        const sy = mkSY([yMin, yMax], mt, ch);
+        drawGrid(ctx, [0, y.length - 1], [yMin, yMax], sx, sy, ml, mt, cw, ch, 6, 5);
+
+        // 折线
+        ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 1.8; ctx.setLineDash([]);
+        ctx.beginPath();
+        y.forEach((v, i) => i === 0 ? ctx.moveTo(sx(i), sy(v)) : ctx.lineTo(sx(i), sy(v)));
+        ctx.stroke();
+
+        // 首尾期间标注
+        ctx.fillStyle = '#8b949e'; ctx.font = '9px JetBrains Mono,monospace';
+        ctx.textAlign = 'left';  ctx.fillText(periods[0],              ml + 2,      mt + ch + 16);
+        ctx.textAlign = 'right'; ctx.fillText(periods[periods.length - 1], ml + cw, mt + ch + 16);
+        legend(ctx, ml + 8, mt + 12, '#58a6ff', label);
+      }
+    };
+  } catch (err) {
+    return { reply: `已调用统计CLI：\nBEA 请求异常：${err.message}` };
+  }
+}
 
 // ── Init ──────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',()=>{

@@ -1106,20 +1106,16 @@ async function runBeaFetch(args) {
 
   try {
     const resp = await fetch(
-      `/.netlify/functions/bea-proxy?table=${table_name}&freq=${frequency}&year=${year}`
+      `/.netlify/functions/bea-proxy?tableName=${table_name}&frequency=${frequency}&year=${year}`
     );
     const json = await resp.json();
 
-    if (json.beaError) {
-      return { reply: `已调用统计CLI：\nBEA 数据获取失败：${json.beaError}` };
+    if (json.beaError || (json.error)) {
+      return { reply: `已调用统计CLI：\nBEA 数据获取失败：${json.beaError || json.error}` };
     }
 
-    // 解析原始数据行
-    let rows = [];
-    try {
-      const raw = typeof json.rawSlice === 'string' ? JSON.parse(json.rawSlice) : json.rawSlice;
-      rows = raw?.BEA?.Results?.Data || [];
-    } catch(_) {}
+    // 模式三直接返回 { data: [...], meta, debug }
+    const rows = json.data || [];
 
     if (!rows.length) {
       return { reply: `已调用统计CLI：\nBEA 返回数据为空（表：${table_name}，频率：${frequency}）` };

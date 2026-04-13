@@ -1106,7 +1106,7 @@ async function runBeaFetch(args) {
 
   try {
     const resp = await fetch(
-      `/.netlify/functions/bea-proxy?tableName=${table_name}&frequency=${frequency}&year=${year}`
+      `https://bea-gong.netlify.app/.netlify/functions/bea-proxy?tableName=${table_name}&frequency=${frequency}&year=${year}`
     );
     const json = await resp.json();
 

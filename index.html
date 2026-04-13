@@ -168,6 +168,7 @@ const TOOL_META = {
   run_arima:        { tab:'timeseries',   label:'时间序列',   chips:['ARIMA时间序列分析','VAR向量自回归','时序趋势预测'] },
   run_panel:        { tab:'panel',        label:'面板数据',   chips:['面板数据固定效应','随机效应估计','Hausman检验'] },
   fetch_bea_data:   { tab:'timeseries',   label:'BEA数据',    chips:['查询美国GDP季度数据','获取PCE月度数据','BEA年度国民账户'] },
+  run_correlation_matrix: { tab:'timeseries', label:'相关矩阵', chips:['多变量相关矩阵','序列相关性分析','领先滞后相关分析'] },
 };
 
 const TAB_CHIPS = {
@@ -347,6 +348,18 @@ async function sendMessage() {
           args._y = window._pipelineData.y;
           args._periods = window._pipelineData.labels;
         }
+        // 多序列注入 VAR 和相关矩阵
+        if (tool === 'run_arima' && window._pipelineData.multi) {
+          args._y       = window._pipelineData.series[0].values;
+          args._y2      = window._pipelineData.series[1]?.values;
+          args._periods = window._pipelineData.periods;
+          args.var_mode = true;
+          args._multiSeries = window._pipelineData.series;
+        }
+        if (tool === 'run_correlation_matrix') {
+          args._series  = window._pipelineData.series;
+          args._periods = window._pipelineData.periods;
+        }
       }
 
       const result = await runTool(tool, args);
@@ -378,18 +391,19 @@ async function sendMessage() {
 // ══════════════════════════════════════════════════════
 async function runTool(name, args) {
   switch (name) {
-    case 'run_regression':   return runRegression(args);
-    case 'run_logistic':     return runLogistic();
-    case 'run_discriminant': return runDiscriminant();
-    case 'run_kmeans':       return runKMeans(args.k || 3);
-    case 'run_normal':       return runNormal(args.mu ?? 0, args.sig ?? 1);
-    case 'run_poisson':      return runPoisson(args.lambda ?? 3);
-    case 'run_binomial':     return runBinomial(args.n ?? 10, args.p ?? 0.5);
-    case 'run_custom_plot':  return runCustomPlot(args);
-    case 'run_scatter':      return runScatter(args);
-    case 'run_arima':        return runArima(args);
-    case 'run_panel':        return runPanel(args);
-    case 'fetch_bea_data':   return await runBeaFetch(args);
+    case 'run_regression':          return runRegression(args);
+    case 'run_logistic':            return runLogistic();
+    case 'run_discriminant':        return runDiscriminant();
+    case 'run_kmeans':              return runKMeans(args.k || 3);
+    case 'run_normal':              return runNormal(args.mu ?? 0, args.sig ?? 1);
+    case 'run_poisson':             return runPoisson(args.lambda ?? 3);
+    case 'run_binomial':            return runBinomial(args.n ?? 10, args.p ?? 0.5);
+    case 'run_custom_plot':         return runCustomPlot(args);
+    case 'run_scatter':             return runScatter(args);
+    case 'run_arima':               return runArima(args);
+    case 'run_panel':               return runPanel(args);
+    case 'fetch_bea_data':          return await runBeaFetch(args);
+    case 'run_correlation_matrix':  return runCorrelationMatrix(args);
     default: return { reply: `未知工具：${name}` };
   }
 }
@@ -1094,6 +1108,141 @@ function runPanel(args) {
   }};
 }
 
+// ══════════════════════════════════════════════════════
+// ⑪ 多变量相关矩阵（来自多序列管道）
+// ══════════════════════════════════════════════════════
+function runCorrelationMatrix(args) {
+  const series  = args._series  || window._pipelineData?.series;
+  const periods = args._periods || window._pipelineData?.periods || [];
+
+  if (!series || series.length < 2) {
+    return { reply: '已调用统计CLI：\n需要至少2条序列，请先从多表采集台推送数据。' };
+  }
+
+  const n = series.length;
+
+  // Pearson 相关系数
+  function pearson(a, b) {
+    const pairs = a.map((v,i)=>[v,b[i]]).filter(([x,y])=>x!=null&&y!=null&&!isNaN(x)&&!isNaN(y));
+    if (pairs.length < 3) return 0;
+    const nn=pairs.length;
+    const mx=pairs.reduce((s,[x])=>s+x,0)/nn;
+    const my=pairs.reduce((s,[,y])=>s+y,0)/nn;
+    let num=0,dx=0,dy=0;
+    pairs.forEach(([x,y])=>{num+=(x-mx)*(y-my);dx+=(x-mx)**2;dy+=(y-my)**2;});
+    return dx>0&&dy>0 ? num/Math.sqrt(dx*dy) : 0;
+  }
+
+  // 相关矩阵
+  const corr = Array.from({length:n},(_,i)=>Array.from({length:n},(_,j)=>pearson(series[i].values,series[j].values)));
+
+  // 交叉相关（领先滞后，最多±8期）
+  const MAX_LAG = Math.min(8, Math.floor(series[0].values.length / 4));
+  function crossCorr(a, b, lag) {
+    const len = a.length;
+    if (lag >= 0) {
+      const pairs = Array.from({length:len-lag},(_,i)=>[a[i],b[i+lag]]).filter(([x,y])=>x!=null&&y!=null);
+      return pearson(pairs.map(p=>p[0]),pairs.map(p=>p[1]));
+    } else {
+      return crossCorr(b, a, -lag);
+    }
+  }
+
+  // 找最大相关的滞后期（仅对第一对序列）
+  let bestLag = 0, bestCorr = corr[0][1];
+  for (let lag = -MAX_LAG; lag <= MAX_LAG; lag++) {
+    const c = crossCorr(series[0].values, series[1].values, lag);
+    if (Math.abs(c) > Math.abs(bestCorr)) { bestCorr = c; bestLag = lag; }
+  }
+
+  const lagDesc = bestLag < 0
+    ? `${series[0].id} 领先 ${series[1].id} ${-bestLag} 期`
+    : bestLag > 0
+    ? `${series[0].id} 滞后 ${series[1].id} ${bestLag} 期`
+    : `${series[0].id} 与 ${series[1].id} 同期相关最强`;
+
+  let reply = `已调用统计CLI：\n多变量相关矩阵\n序列数：${n}　时期：${periods.length}\n${'─'.repeat(36)}\n`;
+  for (let i=0;i<n;i++) {
+    for (let j=i+1;j<n;j++) {
+      reply += `r(${series[i].id}, ${series[j].id}) = ${corr[i][j].toFixed(4)}\n`;
+    }
+  }
+  reply += `${'─'.repeat(36)}\n交叉相关分析（${series[0].id} vs ${series[1].id}）：\n最强相关：lag=${bestLag}，r=${bestCorr.toFixed(4)}\n结论：${lagDesc}`;
+
+  return {
+    reply,
+    draw: () => {
+      setupViz(
+        `多变量相关矩阵 · ${n} 序列`,
+        series.map(s=>`<span>${s.id}</span>`).join(' · ')
+      );
+      const { ctx, ml, mt, cw, ch } = getCtx();
+      ctx.clearRect(0, 0, vizCanvas.width, vizCanvas.height);
+
+      // 绘制相关矩阵热图
+      const cellW = Math.min(cw / n, ch / n);
+      const startX = ml + (cw - cellW * n) / 2;
+      const startY = mt + (ch - cellW * n) / 2;
+
+      for (let i = 0; i < n; i++) {
+        for (let j = 0; j < n; j++) {
+          const v = corr[i][j];
+          const r = v > 0
+            ? `rgba(58,166,255,${Math.abs(v).toFixed(2)})`
+            : `rgba(255,123,114,${Math.abs(v).toFixed(2)})`;
+          ctx.fillStyle = r;
+          ctx.fillRect(startX + j*cellW, startY + i*cellW, cellW-2, cellW-2);
+          ctx.fillStyle = Math.abs(v) > 0.5 ? '#fff' : '#8b949e';
+          ctx.font = `${Math.max(8, Math.floor(cellW*0.28))}px JetBrains Mono,monospace`;
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(v.toFixed(2), startX+j*cellW+cellW/2, startY+i*cellW+cellW/2);
+        }
+        // 行标签
+        ctx.fillStyle = '#8b949e';
+        ctx.font = '9px JetBrains Mono,monospace';
+        ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
+        ctx.fillText(series[i].id, startX - 4, startY + i*cellW + cellW/2);
+        // 列标签
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.fillText(series[j === undefined ? i : i].id, startX + i*cellW + cellW/2, startY + n*cellW + 4);
+      }
+      // 列标签补全
+      for (let j=0;j<n;j++) {
+        ctx.fillStyle = '#8b949e';
+        ctx.font = '9px JetBrains Mono,monospace';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+        ctx.fillText(series[j].id, startX + j*cellW + cellW/2, startY + n*cellW + 4);
+      }
+
+      // 交叉相关折线（右侧区域）
+      const ccX = startX + n*cellW + 20;
+      if (ccX + 80 < ml + cw) {
+        const lags = Array.from({length:MAX_LAG*2+1},(_,i)=>i-MAX_LAG);
+        const ccs  = lags.map(lag => crossCorr(series[0].values, series[1].values, lag));
+        const ccW  = ml + cw - ccX - 4;
+        const sx2  = mkS([-MAX_LAG, MAX_LAG], ccX, ccW);
+        const ccYmin = Math.min(-0.5, ...ccs)-0.1, ccYmax = Math.max(0.5,...ccs)+0.1;
+        const sy2  = mkSY([ccYmin, ccYmax], mt, ch);
+        // 零线
+        ctx.strokeStyle='#30363d'; ctx.lineWidth=1; ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.moveTo(ccX, sy2(0)); ctx.lineTo(ccX+ccW, sy2(0)); ctx.stroke();
+        ctx.setLineDash([]);
+        // 折线
+        ctx.strokeStyle='#bc8cff'; ctx.lineWidth=1.5;
+        ctx.beginPath();
+        lags.forEach((lag,i)=>i===0?ctx.moveTo(sx2(lag),sy2(ccs[i])):ctx.lineTo(sx2(lag),sy2(ccs[i])));
+        ctx.stroke();
+        // 标注 bestLag
+        ctx.fillStyle='#e3b341';
+        ctx.beginPath(); ctx.arc(sx2(bestLag),sy2(bestCorr),4,0,Math.PI*2); ctx.fill();
+        ctx.fillStyle='#8b949e'; ctx.font='9px JetBrains Mono,monospace'; ctx.textAlign='center';
+        ctx.fillText(`lag=${bestLag}`, sx2(bestLag), sy2(bestCorr)-10);
+        ctx.fillText('交叉相关', ccX+ccW/2, mt+ch+14);
+      }
+    }
+  };
+}
+
 function mean(arr){return arr.reduce((a,b)=>a+b,0)/arr.length;}
 
 // ══════════════════════════════════════════════════════
@@ -1185,31 +1334,35 @@ window.addEventListener('DOMContentLoaded',()=>{
     '<em style="color:var(--muted)">试试：帮我做线性回归 / K=4聚类 / 泊松分布λ=5</em>'
   );
 
-  // ── 数据管道：读取来自 opencli-gong 的 URL 参数 ──
+  // ── 数据管道：读取来自 opencli-gong / multi-collect 的 URL 参数 ──
   const params = new URLSearchParams(window.location.search);
   const raw = params.get('pipeline');
   if (raw) {
     try {
-      const { cmd, p, v } = JSON.parse(decodeURIComponent(raw));
-      if (p && v && p.length > 0) {
-        const nodes = p.map((period, i) => ({ period, value: v[i] }));
+      const parsed = JSON.parse(decodeURIComponent(raw));
 
-        // ── 关键修复：将真实数据存入全局，供 runRegression 使用 ──
-        // X 使用序号（1,2,3...），Y 使用实际数值，labels 保留期间标签
+      // ══ 多序列格式（来自 multi-collect.html）══
+      // { multi:true, periods:[...], series:[{id,desc,values},...] }
+      if (parsed.multi && parsed.series?.length >= 2) {
+        const { periods, series } = parsed;
+
+        // 存入全局多序列管道
         window._pipelineData = {
-          x:      nodes.map((_, i) => i + 1),
-          y:      nodes.map(n => n.value),
-          labels: nodes.map(n => n.period),
-          cmd,
+          x:      periods.map((_,i) => i+1),
+          y:      series[0].values,
+          labels: periods,
+          cmd:    series.map(s=>s.id).join('+'),
+          multi:  true,
+          series: series.map(s => ({ id:s.id, desc:s.desc, values:s.values })),
+          periods,
         };
 
-        const yValues = nodes.map(n => n.value).join(', ');
-        const periods  = nodes.map(n => n.period).join(', ');
-        const prompt   =
-          `来自 OpenCLI 数据采集台（指标：${cmd}），共 ${nodes.length} 条记录。\n` +
-          `期间：${periods}\n` +
-          `数值：${yValues}\n\n` +
-          `请帮我做线性回归分析。`;
+        const seriesDesc = series.map(s=>`${s.id}(${s.desc})`).join('、');
+        const prompt =
+          `来自 OpenCLI 多表采集台，共 ${series.length} 条序列，${periods.length} 个时期。\n` +
+          `序列：${seriesDesc}\n` +
+          `时期范围：${periods[0]} → ${periods[periods.length-1]}\n\n` +
+          `请帮我做VAR向量自回归分析，分析各序列的领先滞后关系。`;
 
         const input = document.getElementById('user-input');
         if (input) {
@@ -1221,15 +1374,55 @@ window.addEventListener('DOMContentLoaded',()=>{
           }, 400);
         }
 
-        // 顶部绿色横幅
         const banner = document.createElement('div');
         banner.style.cssText =
-          'position:fixed;top:0;left:0;right:0;background:#238636;' +
-          'color:#fff;text-align:center;padding:9px 16px;font-size:13px;z-index:9999;';
+          'position:fixed;top:0;left:0;right:0;background:#1a4731;' +
+          'color:#3fb950;text-align:center;padding:9px 16px;font-size:13px;z-index:9999;' +
+          'border-bottom:1px solid #238636;';
         banner.textContent =
-          `✅ 已接收来自 OpenCLI 的数据：${cmd}，共 ${nodes.length} 条，正在自动分析…`;
+          `✅ 已接收多序列数据：${series.length} 条序列 · ${periods.length} 个时期 · ${series.map(s=>s.id).join(' + ')}`;
         document.body.prepend(banner);
-        setTimeout(() => banner.remove(), 4000);
+        setTimeout(() => banner.remove(), 5000);
+
+      // ══ 单序列格式（原有格式）══
+      } else {
+        const { cmd, p, v } = parsed;
+        if (p && v && p.length > 0) {
+          const nodes = p.map((period, i) => ({ period, value: v[i] }));
+          window._pipelineData = {
+            x:      nodes.map((_, i) => i + 1),
+            y:      nodes.map(n => n.value),
+            labels: nodes.map(n => n.period),
+            cmd,
+          };
+
+          const yValues = nodes.map(n => n.value).join(', ');
+          const periods  = nodes.map(n => n.period).join(', ');
+          const prompt   =
+            `来自 OpenCLI 数据采集台（指标：${cmd}），共 ${nodes.length} 条记录。\n` +
+            `期间：${periods}\n` +
+            `数值：${yValues}\n\n` +
+            `请帮我做线性回归分析。`;
+
+          const input = document.getElementById('user-input');
+          if (input) {
+            input.value = prompt;
+            input.dispatchEvent(new Event('input'));
+            setTimeout(() => {
+              const btn = document.getElementById('send-btn');
+              if (btn && !btn.disabled) btn.click();
+            }, 400);
+          }
+
+          const banner = document.createElement('div');
+          banner.style.cssText =
+            'position:fixed;top:0;left:0;right:0;background:#238636;' +
+            'color:#fff;text-align:center;padding:9px 16px;font-size:13px;z-index:9999;';
+          banner.textContent =
+            `✅ 已接收来自 OpenCLI 的数据：${cmd}，共 ${nodes.length} 条，正在自动分析…`;
+          document.body.prepend(banner);
+          setTimeout(() => banner.remove(), 4000);
+        }
       }
     } catch(e) {
       console.error('[Pipeline] 解析失败：', e);

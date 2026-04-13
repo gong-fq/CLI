@@ -142,6 +142,20 @@ const TOOLS = [
   {
     type: "function",
     function: {
+      name: "run_correlation_matrix",
+      description: "多变量相关矩阵与交叉相关分析。当用户推送了多条序列（multi=true的管道数据）并要求分析相关性、领先滞后关系时调用。计算Pearson相关矩阵和交叉相关函数，识别最优领先滞后期数。",
+      parameters: {
+        type: "object",
+        properties: {
+          max_lag: { type: "integer", description: "最大滞后期数，默认8", default: 8 }
+        },
+        required: []
+      }
+    }
+  },
+  {
+    type: "function",
+    function: {
       name: "fetch_bea_data",
       description: "从美国经济分析局（BEA）获取宏观经济数据。用户提到BEA、美国GDP、PCE、GNP、NIPA国民账户时调用。",
       parameters: {
@@ -181,6 +195,7 @@ const TOOLS = [
 
 // 关键词兜底映射（仅针对已有的7个固定工具）
 const KEYWORD_MAP = [
+  { keys: ['相关矩阵','交叉相关','领先滞后','相关性分析','多变量相关'], tool: 'run_correlation_matrix', argFn: () => ({}) },
   { keys: ['bea','美国gdp','nipa','国民账户','美国经济分析','pce数据','美国pce'], tool: 'fetch_bea_data', argFn: extractBeaArgs },
   { keys: ['散点图', 'scatter', '散点'],         tool: 'run_scatter',     argFn: () => ({}) },
   { keys: ['时间序列', 'arima', '时序', 'var模型', '向量自回归'], tool: 'run_arima', argFn: extractArimaArgs },
@@ -256,6 +271,7 @@ exports.handler = async (event) => {
 - 时间序列/ARIMA/时序/VAR → run_arima（提取p/d/q；管道数据提取y和periods；VAR设var_mode=true）
 - 面板数据/固定效应/随机效应/Hausman → run_panel（model: fe/re/both）
 - BEA数据/美国GDP/NIPA/PCE → fetch_bea_data（提取table_name/frequency）
+- 相关矩阵/交叉相关/领先滞后/多变量相关 → run_correlation_matrix（多序列管道数据时使用）
 
 【数据管道 — 极重要】当用户消息中包含"数值：..."这一行时：
 - run_regression/run_scatter：y=数值数组，x=[1,2,...,n]
